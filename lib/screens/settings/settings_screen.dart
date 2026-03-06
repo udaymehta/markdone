@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../core/widgets/centered_popup.dart';
 import '../../providers/settings_providers.dart';
 import '../../providers/project_providers.dart';
 import '../../providers/theme_provider.dart';
@@ -403,63 +404,62 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Future<void> _pickAccentColor(BuildContext context) async {
     final currentColor = ref.read(accentColorProvider);
-    final selectedColor = await showModalBottomSheet<Color>(
+    final selectedColor = await showCenteredPopup<Color>(
       context: context,
       builder: (ctx) {
         final theme = Theme.of(ctx);
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Accent Color', style: theme.textTheme.headlineSmall),
-                const SizedBox(height: 8),
-                Text(
-                  'Choose the color used across the app.',
-                  style: theme.textTheme.bodySmall,
-                ),
-                const SizedBox(height: 20),
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  children: [
-                    for (final color in _accentOptions)
-                      InkWell(
-                        borderRadius: BorderRadius.circular(999),
-                        onTap: () => Navigator.pop(ctx, color),
-                        child: Container(
-                          width: 42,
-                          height: 42,
-                          decoration: BoxDecoration(
-                            color: color,
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: currentColor.toARGB32() == color.toARGB32()
-                                  ? theme.colorScheme.onSurface
-                                  : Colors.transparent,
-                              width: 2.5,
-                            ),
+        return CenteredPopupContent(
+          scrollable: false,
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Accent Color', style: theme.textTheme.headlineSmall),
+              const SizedBox(height: 8),
+              Text(
+                'Choose the color used across the app.',
+                style: theme.textTheme.bodySmall,
+              ),
+              const SizedBox(height: 20),
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  for (final color in _accentOptions)
+                    InkWell(
+                      borderRadius: BorderRadius.circular(999),
+                      onTap: () => Navigator.pop(ctx, color),
+                      child: Container(
+                        width: 42,
+                        height: 42,
+                        decoration: BoxDecoration(
+                          color: color,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: currentColor.toARGB32() == color.toARGB32()
+                                ? theme.colorScheme.onSurface
+                                : Colors.transparent,
+                            width: 2.5,
                           ),
-                          child: currentColor.toARGB32() == color.toARGB32()
-                              ? const Icon(
-                                  Icons.check_rounded,
-                                  color: Colors.white,
-                                )
-                              : null,
                         ),
+                        child: currentColor.toARGB32() == color.toARGB32()
+                            ? const Icon(
+                                Icons.check_rounded,
+                                color: Colors.white,
+                              )
+                            : null,
                       ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-                TextButton.icon(
-                  onPressed: () => Navigator.pop(ctx, _accentOptions.first),
-                  icon: const Icon(Icons.refresh_rounded),
-                  label: const Text('Reset to default'),
-                ),
-              ],
-            ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              TextButton.icon(
+                onPressed: () => Navigator.pop(ctx, _accentOptions.first),
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('Reset to default'),
+              ),
+            ],
           ),
         );
       },
@@ -525,66 +525,57 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     final currentCalId = ref.read(selectedCalendarIdProvider);
 
-    final selected = await showModalBottomSheet<CalendarInfo>(
+    final selected = await showCenteredPopup<CalendarInfo>(
       context: context,
-      isScrollControlled: true,
       builder: (ctx) {
         final theme = Theme.of(ctx);
-        return DraggableScrollableSheet(
-          initialChildSize: 0.5,
-          maxChildSize: 0.85,
-          minChildSize: 0.3,
-          expand: false,
-          builder: (ctx, scrollController) {
-            return SafeArea(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
-                    child: Text(
-                      'Select Calendar',
-                      style: theme.textTheme.headlineSmall,
-                    ),
-                  ),
-                  Expanded(
-                    child: ListView.builder(
-                      controller: scrollController,
-                      itemCount: calendars.length,
-                      itemBuilder: (ctx, index) {
-                        final cal = calendars[index];
-                        final isSelected = currentCalId == cal.id;
-                        final readOnlyLabel = cal.isReadOnly
-                            ? ' (Read-only)'
-                            : '';
+        return CenteredPopupContent(
+          scrollable: false,
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+          child: SizedBox(
+            width: double.infinity,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Select Calendar', style: theme.textTheme.headlineSmall),
+                const SizedBox(height: 12),
+                SizedBox(
+                  height: MediaQuery.sizeOf(ctx).height * 0.5,
+                  child: ListView.builder(
+                    itemCount: calendars.length,
+                    itemBuilder: (ctx, index) {
+                      final cal = calendars[index];
+                      final isSelected = currentCalId == cal.id;
+                      final readOnlyLabel = cal.isReadOnly
+                          ? ' (Read-only)'
+                          : '';
 
-                        return ListTile(
-                          leading: Icon(
-                            Icons.calendar_today_rounded,
-                            color: cal.color != null
-                                ? Color(cal.color!)
-                                : theme.colorScheme.primary,
-                          ),
-                          title: Text(cal.displayName + readOnlyLabel),
-                          subtitle: cal.subtitle.isNotEmpty
-                              ? Text(cal.subtitle)
-                              : null,
-                          trailing: isSelected
-                              ? Icon(
-                                  Icons.check_circle_rounded,
-                                  color: theme.colorScheme.primary,
-                                )
-                              : null,
-                          onTap: () => Navigator.pop(ctx, cal),
-                        );
-                      },
-                    ),
+                      return ListTile(
+                        leading: Icon(
+                          Icons.calendar_today_rounded,
+                          color: cal.color != null
+                              ? Color(cal.color!)
+                              : theme.colorScheme.primary,
+                        ),
+                        title: Text(cal.displayName + readOnlyLabel),
+                        subtitle: cal.subtitle.isNotEmpty
+                            ? Text(cal.subtitle)
+                            : null,
+                        trailing: isSelected
+                            ? Icon(
+                                Icons.check_circle_rounded,
+                                color: theme.colorScheme.primary,
+                              )
+                            : null,
+                        onTap: () => Navigator.pop(ctx, cal),
+                      );
+                    },
                   ),
-                ],
-              ),
-            );
-          },
+                ),
+              ],
+            ),
+          ),
         );
       },
     );
