@@ -1,0 +1,3 @@
+PRODUCT_NAME = markdone
+PRODUCT_BUNDLE_IDENTIFIER = com.app.markdone
+PRODUCT_COPYRIGHT = Copyright © 2026 MarkDone contributors. All rights reserved.
