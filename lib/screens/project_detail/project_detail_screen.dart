@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import '../../core/widgets/centered_popup.dart';
 import '../../models/master_project.dart';
 import '../../models/sub_todo.dart';
 import '../../providers/project_providers.dart';
@@ -298,19 +299,12 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     String? reminderStr = '30m';
     var addToCalendar = canSyncTaskToCalendar;
 
-    showModalBottomSheet(
+    showCenteredPopup(
       context: context,
-      isScrollControlled: true,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSheetState) {
           final theme = Theme.of(ctx);
-          return Padding(
-            padding: EdgeInsets.fromLTRB(
-              24,
-              24,
-              24,
-              MediaQuery.of(ctx).viewInsets.bottom + 24,
-            ),
+          return CenteredPopupContent(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -450,19 +444,12 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     String? reminderStr = todo.reminderString;
     var addToCalendar = todo.syncToCalendar;
 
-    showModalBottomSheet(
+    showCenteredPopup(
       context: context,
-      isScrollControlled: true,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSheetState) {
           final theme = Theme.of(ctx);
-          return Padding(
-            padding: EdgeInsets.fromLTRB(
-              24,
-              24,
-              24,
-              MediaQuery.of(ctx).viewInsets.bottom + 24,
-            ),
+          return CenteredPopupContent(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -666,19 +653,12 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     // Check if calendar sync is globally enabled
     final calSyncEnabled = ref.read(calendarSyncEnabledProvider);
 
-    showModalBottomSheet(
+    showCenteredPopup(
       context: context,
-      isScrollControlled: true,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSheetState) {
           final theme = Theme.of(ctx);
-          return Padding(
-            padding: EdgeInsets.fromLTRB(
-              24,
-              24,
-              24,
-              MediaQuery.of(ctx).viewInsets.bottom + 24,
-            ),
+          return CenteredPopupContent(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,

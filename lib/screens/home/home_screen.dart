@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/widgets/centered_popup.dart';
 import '../../models/master_project.dart';
 import '../../providers/project_providers.dart';
 import '../../providers/settings_providers.dart';
@@ -227,19 +228,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     // Check if calendar sync is globally enabled
     final calSyncEnabled = ref.read(calendarSyncEnabledProvider);
 
-    showModalBottomSheet(
+    showCenteredPopup(
       context: context,
-      isScrollControlled: true,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSheetState) {
           final theme = Theme.of(ctx);
-          return Padding(
-            padding: EdgeInsets.fromLTRB(
-              24,
-              24,
-              24,
-              MediaQuery.of(ctx).viewInsets.bottom + 24,
-            ),
+          return CenteredPopupContent(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -331,9 +325,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   void _showProjectOptions(BuildContext context, MasterProject project) {
     final theme = Theme.of(context);
 
-    showModalBottomSheet(
+    showCenteredPopup(
       context: context,
-      builder: (ctx) => SafeArea(
+      builder: (ctx) => CenteredPopupContent(
+        scrollable: false,
+        padding: const EdgeInsets.symmetric(vertical: 12),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
