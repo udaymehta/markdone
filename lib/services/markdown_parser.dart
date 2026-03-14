@@ -53,7 +53,6 @@ class MarkdownParser {
     // --- Parse sub-todos from body ---
     final lines = body.split('\n');
     final todos = <SubTodo>[];
-    int todoIndex = 0;
 
     for (int i = 0; i < lines.length; i++) {
       final line = lines[i];
@@ -64,10 +63,12 @@ class MarkdownParser {
         String rawTitle = match.group(3)!.trim();
 
         // Extract hidden metadata comment
+        String? persistentId;
         DateTime? alarm;
         var syncToCalendar = true;
         String? calendarEventId;
         Duration? reminderBefore;
+        RecurrenceRule? recurrence;
 
         final metaMatch = _metadataCommentRegex.firstMatch(rawTitle);
         if (metaMatch != null) {
@@ -76,6 +77,9 @@ class MarkdownParser {
           try {
             final metaJson =
                 jsonDecode(metaMatch.group(1)!) as Map<String, dynamic>;
+            if (metaJson['id'] != null) {
+              persistentId = metaJson['id'].toString();
+            }
             if (metaJson['alarm'] != null) {
               alarm = DateTime.tryParse(metaJson['alarm'].toString());
             }
@@ -90,12 +94,22 @@ class MarkdownParser {
                 metaJson['reminder'].toString(),
               );
             }
+            recurrence = RecurrenceRule.fromJson(
+              metaJson['recurrence'],
+              fallbackAlarm: alarm,
+            );
           } catch (_) {
             // Ignore malformed metadata
           }
         }
 
-        final id = '${filePath.hashCode}_$todoIndex';
+        final id =
+            persistentId ??
+            SubTodo.generateFallbackId(
+              filePath: filePath,
+              lineIndex: i,
+              title: rawTitle,
+            );
         todos.add(
           SubTodo(
             id: id,
@@ -105,10 +119,10 @@ class MarkdownParser {
             syncToCalendar: syncToCalendar,
             calendarEventId: calendarEventId,
             reminderBefore: reminderBefore,
+            recurrence: recurrence,
             lineIndex: i,
-          ),
+          ).normalizedSchedule(),
         );
-        todoIndex++;
       }
     }
 

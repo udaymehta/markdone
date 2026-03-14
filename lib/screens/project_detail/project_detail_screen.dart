@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../core/widgets/centered_popup.dart';
@@ -288,184 +289,118 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
   }
 
   void _showAddTodoSheet(BuildContext context) {
-    final titleController = TextEditingController();
-    final project = ref.read(projectByPathProvider(widget.filePath));
-    if (project == null) return;
-
-    final calendarSyncEnabled = ref.read(calendarSyncEnabledProvider);
-    final canSyncTaskToCalendar =
-        calendarSyncEnabled && project.syncWithCalendar && !project.isArchived;
-    DateTime? alarm;
-    String? reminderStr = '30m';
-    var addToCalendar = canSyncTaskToCalendar;
-
-    showCenteredPopup(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheetState) {
-          final theme = Theme.of(ctx);
-          return CenteredPopupContent(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text('New Task', style: theme.textTheme.headlineSmall),
-                const SizedBox(height: 20),
-                TextField(
-                  controller: titleController,
-                  autofocus: true,
-                  decoration: const InputDecoration(
-                    hintText: 'Task name',
-                    prefixIcon: Icon(Icons.check_circle_outline_rounded),
-                  ),
-                  textCapitalization: TextCapitalization.sentences,
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () async {
-                          final date = await showDatePicker(
-                            context: ctx,
-                            initialDate: DateTime.now(),
-                            firstDate: DateTime.now().subtract(
-                              const Duration(days: 1),
-                            ),
-                            lastDate: DateTime.now().add(
-                              const Duration(days: 3650),
-                            ),
-                          );
-                          if (date != null && ctx.mounted) {
-                            final time = await showTimePicker(
-                              context: ctx,
-                              initialTime: TimeOfDay.now(),
-                            );
-                            if (time != null) {
-                              setSheetState(() {
-                                alarm = DateTime(
-                                  date.year,
-                                  date.month,
-                                  date.day,
-                                  time.hour,
-                                  time.minute,
-                                );
-                              });
-                            }
-                          }
-                        },
-                        icon: const Icon(Icons.alarm_rounded, size: 18),
-                        label: Text(
-                          alarm != null
-                              ? DateFormat('MMM d, h:mm a').format(alarm!)
-                              : 'Set Alarm',
-                          style: const TextStyle(fontSize: 13),
-                        ),
-                      ),
-                    ),
-                    if (alarm != null) ...[
-                      const SizedBox(width: 8),
-                      DropdownButton<String>(
-                        value: reminderStr,
-                        hint: const Text(
-                          'Reminder',
-                          style: TextStyle(fontSize: 13),
-                        ),
-                        items: const [
-                          DropdownMenuItem(value: '5m', child: Text('5 min')),
-                          DropdownMenuItem(value: '15m', child: Text('15 min')),
-                          DropdownMenuItem(value: '30m', child: Text('30 min')),
-                          DropdownMenuItem(value: '1h', child: Text('1 hour')),
-                          DropdownMenuItem(value: '1d', child: Text('1 day')),
-                        ],
-                        onChanged: (v) => setSheetState(() => reminderStr = v),
-                      ),
-                    ],
-                  ],
-                ),
-                if (canSyncTaskToCalendar) ...[
-                  const SizedBox(height: 8),
-                  CheckboxListTile(
-                    value: addToCalendar,
-                    onChanged: (value) =>
-                        setSheetState(() => addToCalendar = value ?? false),
-                    title: const Text('Add to calendar'),
-                    subtitle: Text(
-                      alarm == null
-                          ? 'Set an alarm if you want this task on your calendar'
-                          : 'Keep this task as an app-only notification by turning this off',
-                    ),
-                    secondary: const Icon(Icons.event_outlined),
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                    controlAffinity: ListTileControlAffinity.leading,
-                  ),
-                ],
-                const SizedBox(height: 20),
-                FilledButton(
-                  onPressed: () {
-                    final title = titleController.text.trim();
-                    if (title.isEmpty) return;
-
-                    final newTodo = SubTodo(
-                      id: '${widget.filePath.hashCode}_${project.todos.length}',
-                      title: title,
-                      isCompleted: false,
-                      alarm: alarm,
-                      syncToCalendar: addToCalendar,
-                      reminderBefore: SubTodo.parseReminderString(reminderStr),
-                      lineIndex: project.todos.length,
-                    );
-
-                    ref
-                        .read(projectsProvider.notifier)
-                        .addTodo(widget.filePath, newTodo);
-                    Navigator.pop(ctx);
-                  },
-                  child: const Text('Add Task'),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
+    _showTodoSheet(context);
   }
 
   void _showEditTodoSheet(BuildContext context, SubTodo todo) {
-    final titleController = TextEditingController(text: todo.title);
+    _showTodoSheet(context, existingTodo: todo);
+  }
+
+  void _showTodoSheet(BuildContext context, {SubTodo? existingTodo}) {
+    final isEditing = existingTodo != null;
+    final titleController = TextEditingController();
+    final reminderConfig = ReminderConfig.fromDuration(
+      existingTodo?.reminderBefore,
+    );
+    final reminderValueController = TextEditingController(
+      text: '${reminderConfig?.value ?? 30}',
+    );
+    final recurrenceIntervalController = TextEditingController(
+      text: '${existingTodo?.recurrence?.interval ?? 1}',
+    );
+    if (isEditing) {
+      titleController.text = existingTodo.title;
+    }
+
     final project = ref.read(projectByPathProvider(widget.filePath));
-    if (project == null) return;
+    if (project == null) {
+      titleController.dispose();
+      reminderValueController.dispose();
+      recurrenceIntervalController.dispose();
+      return;
+    }
 
     final calendarSyncEnabled = ref.read(calendarSyncEnabledProvider);
     final canSyncTaskToCalendar =
         calendarSyncEnabled && project.syncWithCalendar && !project.isArchived;
-    DateTime? alarm = todo.alarm;
-    String? reminderStr = todo.reminderString;
-    var addToCalendar = todo.syncToCalendar;
+    DateTime? alarm = existingTodo?.alarm;
+    var addToCalendar = isEditing
+        ? existingTodo.syncToCalendar && alarm != null
+        : canSyncTaskToCalendar;
+    var reminderEnabled = alarm != null && reminderConfig != null;
+    var reminderUnit = reminderConfig?.unit ?? ReminderUnit.minutes;
+    var recurrenceEnabled = existingTodo?.recurrence != null;
+    var recurrenceFrequency =
+        existingTodo?.recurrence?.frequency ?? RecurrenceFrequency.daily;
 
-    showCenteredPopup(
+    showCenteredPopup<void>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSheetState) {
           final theme = Theme.of(ctx);
+          final reminderValue = _parsePositiveInt(reminderValueController.text);
+          final recurrenceInterval = _parsePositiveInt(
+            recurrenceIntervalController.text,
+          );
+          final activeReminder =
+              alarm != null && reminderEnabled && reminderValue != null
+              ? ReminderConfig(value: reminderValue, unit: reminderUnit)
+              : null;
+          final activeRecurrence =
+              alarm != null && recurrenceEnabled && recurrenceInterval != null
+              ? RecurrenceRule.fromAlarm(
+                  frequency: recurrenceFrequency,
+                  alarm: alarm!,
+                  interval: recurrenceInterval,
+                )
+              : null;
+          final reminderError =
+              alarm != null && reminderEnabled && reminderValue == null
+              ? 'Enter a positive number'
+              : null;
+          final recurrenceError =
+              alarm != null && recurrenceEnabled && recurrenceInterval == null
+              ? 'Enter a positive number'
+              : null;
+          final scheduleValidation = _scheduleValidationMessage(
+            reminder: activeReminder,
+            recurrence: activeRecurrence,
+          );
+          final canSave =
+              titleController.text.trim().isNotEmpty &&
+              reminderError == null &&
+              recurrenceError == null &&
+              scheduleValidation == null;
+
           return CenteredPopupContent(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text('Edit Task', style: theme.textTheme.headlineSmall),
+                Text(
+                  isEditing ? 'Edit Task' : 'New Task',
+                  style: theme.textTheme.headlineSmall,
+                ),
                 const SizedBox(height: 20),
                 TextField(
                   controller: titleController,
-                  decoration: const InputDecoration(
+                  autofocus: !isEditing,
+                  onChanged: (_) => setSheetState(() {}),
+                  decoration: InputDecoration(
                     hintText: 'Task name',
-                    prefixIcon: Icon(Icons.edit_outlined),
+                    prefixIcon: Icon(
+                      isEditing
+                          ? Icons.edit_outlined
+                          : Icons.check_circle_outline_rounded,
+                    ),
                   ),
                   textCapitalization: TextCapitalization.sentences,
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
+                Text('Schedule', style: theme.textTheme.titleSmall),
+                const SizedBox(height: 8),
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
                       child: OutlinedButton.icon(
@@ -489,6 +424,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                             );
                             if (time != null) {
                               setSheetState(() {
+                                final hadAlarm = alarm != null;
                                 alarm = DateTime(
                                   date.year,
                                   date.month,
@@ -496,61 +432,170 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                                   time.hour,
                                   time.minute,
                                 );
+                                if (!hadAlarm) {
+                                  reminderEnabled = true;
+                                  if (_parsePositiveInt(
+                                        reminderValueController.text,
+                                      ) ==
+                                      null) {
+                                    reminderValueController.text = '30';
+                                  }
+                                }
+                                if (!hadAlarm && canSyncTaskToCalendar) {
+                                  addToCalendar = true;
+                                }
                               });
                             }
                           }
                         },
-                        icon: const Icon(
-                          Icons.notifications_outlined,
+                        icon: Icon(
+                          isEditing
+                              ? Icons.notifications_outlined
+                              : Icons.alarm_rounded,
                           size: 18,
                         ),
                         label: Text(
                           alarm != null
-                              ? DateFormat('MMM d, h:mm a').format(alarm!)
-                              : 'Set Reminder',
-                          style: const TextStyle(fontSize: 13),
+                              ? DateFormat('EEE, MMM d - h:mm a').format(alarm!)
+                              : 'Set alarm',
                         ),
                       ),
                     ),
                     if (alarm != null) ...[
-                      const SizedBox(width: 4),
+                      const SizedBox(width: 8),
                       IconButton(
                         icon: Icon(
                           Icons.clear_rounded,
-                          size: 18,
                           color: theme.colorScheme.error,
                         ),
-                        onPressed: () => setSheetState(() => alarm = null),
-                      ),
-                      DropdownButton<String>(
-                        value: reminderStr,
-                        hint: const Text(
-                          'Reminder',
-                          style: TextStyle(fontSize: 13),
-                        ),
-                        items: const [
-                          DropdownMenuItem(value: '5m', child: Text('5 min')),
-                          DropdownMenuItem(value: '15m', child: Text('15 min')),
-                          DropdownMenuItem(value: '30m', child: Text('30 min')),
-                          DropdownMenuItem(value: '1h', child: Text('1 hour')),
-                          DropdownMenuItem(value: '1d', child: Text('1 day')),
-                        ],
-                        onChanged: (v) => setSheetState(() => reminderStr = v),
+                        tooltip: 'Clear alarm',
+                        onPressed: () => setSheetState(() {
+                          alarm = null;
+                          reminderEnabled = false;
+                          recurrenceEnabled = false;
+                          addToCalendar = false;
+                        }),
                       ),
                     ],
                   ],
                 ),
-                if (canSyncTaskToCalendar) ...[
+                if (alarm != null) ...[
+                  const SizedBox(height: 12),
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isWide = constraints.maxWidth >= 420;
+                      final reminderCard = _ScheduleOptionCard(
+                        icon: Icons.notifications_active_outlined,
+                        title: 'Reminder',
+                        subtitle: 'Before the alarm',
+                        enabled: reminderEnabled,
+                        onToggle: (enabled) {
+                          setSheetState(() {
+                            reminderEnabled = enabled;
+                            if (enabled &&
+                                _parsePositiveInt(
+                                      reminderValueController.text,
+                                    ) ==
+                                    null) {
+                              reminderValueController.text = '30';
+                            }
+                          });
+                        },
+                        child: _IntervalEditor<ReminderUnit>(
+                          enabled: reminderEnabled,
+                          valueController: reminderValueController,
+                          onValueChanged: () => setSheetState(() {}),
+                          valueLabel: 'Amount',
+                          valueErrorText: reminderError,
+                          selectedUnit: reminderUnit,
+                          units: ReminderUnit.values,
+                          onChanged: (value) =>
+                              setSheetState(() => reminderUnit = value),
+                          itemLabelBuilder: (unit) =>
+                              _capitalize(unit.pluralUnit),
+                          icon: Icons.timelapse_rounded,
+                        ),
+                      );
+                      final repeatCard = _ScheduleOptionCard(
+                        icon: Icons.repeat_rounded,
+                        title: 'Repeat',
+                        subtitle: 'Next occurrence rule',
+                        enabled: recurrenceEnabled,
+                        onToggle: (enabled) {
+                          setSheetState(() {
+                            recurrenceEnabled = enabled;
+                            if (enabled &&
+                                _parsePositiveInt(
+                                      recurrenceIntervalController.text,
+                                    ) ==
+                                    null) {
+                              recurrenceIntervalController.text = '1';
+                            }
+                          });
+                        },
+                        child: _IntervalEditor<RecurrenceFrequency>(
+                          enabled: recurrenceEnabled,
+                          valueController: recurrenceIntervalController,
+                          onValueChanged: () => setSheetState(() {}),
+                          valueLabel: 'Every',
+                          valueErrorText: recurrenceError,
+                          selectedUnit: recurrenceFrequency,
+                          units: RecurrenceFrequency.values,
+                          onChanged: (value) =>
+                              setSheetState(() => recurrenceFrequency = value),
+                          itemLabelBuilder: (frequency) =>
+                              _capitalize(frequency.pluralUnit),
+                          icon: Icons.schedule_rounded,
+                        ),
+                      );
+
+                      if (isWide) {
+                        return Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(child: reminderCard),
+                            const SizedBox(width: 12),
+                            Expanded(child: repeatCard),
+                          ],
+                        );
+                      }
+
+                      return Column(
+                        children: [
+                          reminderCard,
+                          const SizedBox(height: 12),
+                          repeatCard,
+                        ],
+                      );
+                    },
+                  ),
+                  if (scheduleValidation != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      scheduleValidation,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.error,
+                      ),
+                    ),
+                  ],
+                ] else ...[
                   const SizedBox(height: 8),
+                  Text(
+                    'Set an alarm to unlock custom reminders and repeat intervals.',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+                if (alarm != null && canSyncTaskToCalendar) ...[
+                  const SizedBox(height: 12),
                   CheckboxListTile(
                     value: addToCalendar,
                     onChanged: (value) =>
                         setSheetState(() => addToCalendar = value ?? false),
                     title: const Text('Add to calendar'),
-                    subtitle: Text(
-                      alarm == null
-                          ? 'Set an alarm if you want this task on your calendar'
-                          : 'Turn this off to keep the reminder inside the app only',
+                    subtitle: const Text(
+                      'Turn this off to keep the schedule inside the app only.',
                     ),
                     secondary: const Icon(Icons.event_outlined),
                     dense: true,
@@ -561,72 +606,107 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                 const SizedBox(height: 20),
                 Row(
                   children: [
-                    OutlinedButton.icon(
-                      onPressed: () async {
-                        final shouldDelete = await showDialog<bool>(
-                          context: ctx,
-                          builder: (dialogCtx) => AlertDialog(
-                            title: const Text('Delete Task'),
-                            content: Text(
-                              'Delete "${todo.title}"? This cannot be undone.',
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () =>
-                                    Navigator.pop(dialogCtx, false),
-                                child: const Text('Cancel'),
+                    if (isEditing) ...[
+                      OutlinedButton.icon(
+                        onPressed: () async {
+                          final shouldDelete = await showDialog<bool>(
+                            context: ctx,
+                            builder: (dialogCtx) => AlertDialog(
+                              title: const Text('Delete Task'),
+                              content: Text(
+                                'Delete "${existingTodo.title}"? This cannot be undone.',
                               ),
-                              TextButton(
-                                onPressed: () => Navigator.pop(dialogCtx, true),
-                                child: Text(
-                                  'Delete',
-                                  style: TextStyle(
-                                    color: Theme.of(
-                                      dialogCtx,
-                                    ).colorScheme.error,
+                              actions: [
+                                TextButton(
+                                  onPressed: () =>
+                                      Navigator.pop(dialogCtx, false),
+                                  child: const Text('Cancel'),
+                                ),
+                                TextButton(
+                                  onPressed: () =>
+                                      Navigator.pop(dialogCtx, true),
+                                  child: Text(
+                                    'Delete',
+                                    style: TextStyle(
+                                      color: Theme.of(
+                                        dialogCtx,
+                                      ).colorScheme.error,
+                                    ),
                                   ),
                                 ),
-                              ),
-                            ],
-                          ),
-                        );
-
-                        if (shouldDelete != true) return;
-
-                        await ref
-                            .read(projectsProvider.notifier)
-                            .removeTodo(widget.filePath, todo.id);
-                        if (ctx.mounted) {
-                          Navigator.pop(ctx);
-                        }
-                      },
-                      icon: const Icon(Icons.delete_outline_rounded),
-                      label: const Text('Delete'),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: FilledButton(
-                        onPressed: () {
-                          final title = titleController.text.trim();
-                          if (title.isEmpty) return;
-
-                          final updated = todo.copyWith(
-                            title: title,
-                            alarm: alarm,
-                            syncToCalendar: addToCalendar,
-                            clearAlarm: alarm == null,
-                            reminderBefore: SubTodo.parseReminderString(
-                              reminderStr,
+                              ],
                             ),
-                            clearReminder: reminderStr == null,
                           );
 
-                          ref
+                          if (shouldDelete != true) return;
+
+                          await ref
                               .read(projectsProvider.notifier)
-                              .updateTodo(widget.filePath, updated);
-                          Navigator.pop(ctx);
+                              .removeTodo(widget.filePath, existingTodo.id);
+                          if (ctx.mounted) {
+                            Navigator.pop(ctx);
+                          }
                         },
-                        child: const Text('Save'),
+                        icon: const Icon(Icons.delete_outline_rounded),
+                        label: const Text('Delete'),
+                      ),
+                      const SizedBox(width: 12),
+                    ],
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: canSave
+                            ? () {
+                                final title = titleController.text.trim();
+                                if (title.isEmpty) return;
+
+                                final reminderBefore = activeReminder?.duration;
+
+                                if (!isEditing) {
+                                  final newTodo = SubTodo(
+                                    id: SubTodo.generateId(),
+                                    title: title,
+                                    isCompleted: false,
+                                    alarm: alarm,
+                                    syncToCalendar:
+                                        alarm != null && addToCalendar,
+                                    reminderBefore: reminderBefore,
+                                    recurrence: activeRecurrence,
+                                    lineIndex: project.todos.length,
+                                  ).normalizedSchedule();
+
+                                  ref
+                                      .read(projectsProvider.notifier)
+                                      .addTodo(widget.filePath, newTodo);
+                                  Navigator.pop(ctx);
+                                  return;
+                                }
+
+                                final updated = existingTodo
+                                    .copyWith(
+                                      title: title,
+                                      alarm: alarm,
+                                      syncToCalendar:
+                                          alarm != null && addToCalendar,
+                                      clearAlarm: alarm == null,
+                                      reminderBefore: reminderBefore,
+                                      clearReminder:
+                                          alarm == null ||
+                                          activeReminder == null,
+                                      recurrence: activeRecurrence,
+                                      clearRecurrence:
+                                          alarm == null ||
+                                          activeRecurrence == null,
+                                      clearCalendarEventId: alarm == null,
+                                    )
+                                    .normalizedSchedule();
+
+                                ref
+                                    .read(projectsProvider.notifier)
+                                    .updateTodo(widget.filePath, updated);
+                                Navigator.pop(ctx);
+                              }
+                            : null,
+                        child: Text(isEditing ? 'Save' : 'Add Task'),
                       ),
                     ),
                   ],
@@ -636,7 +716,43 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           );
         },
       ),
-    );
+    ).whenComplete(() {
+      titleController.dispose();
+      reminderValueController.dispose();
+      recurrenceIntervalController.dispose();
+    });
+  }
+
+  static int? _parsePositiveInt(String value) {
+    final parsed = int.tryParse(value.trim());
+    if (parsed == null || parsed <= 0) return null;
+    return parsed;
+  }
+
+  static String _capitalize(String value) {
+    if (value.isEmpty) return value;
+    return '${value[0].toUpperCase()}${value.substring(1)}';
+  }
+
+  static String? _scheduleValidationMessage({
+    ReminderConfig? reminder,
+    RecurrenceRule? recurrence,
+  }) {
+    if (reminder == null || recurrence == null) return null;
+
+    final recurrenceCycle = switch (recurrence.frequency) {
+      RecurrenceFrequency.minutely => Duration(minutes: recurrence.interval),
+      RecurrenceFrequency.hourly => Duration(hours: recurrence.interval),
+      RecurrenceFrequency.daily => Duration(days: recurrence.interval),
+      RecurrenceFrequency.weekly => Duration(days: recurrence.interval * 7),
+      RecurrenceFrequency.monthly || RecurrenceFrequency.yearly => null,
+    };
+
+    if (recurrenceCycle != null && reminder.duration >= recurrenceCycle) {
+      return 'Reminder must be shorter than the repeat interval.';
+    }
+
+    return null;
   }
 
   void _showEditProjectDialog(BuildContext context) {
@@ -948,6 +1064,163 @@ class _DdayChip extends StatelessWidget {
       side: BorderSide.none,
       padding: EdgeInsets.zero,
       visualDensity: VisualDensity.compact,
+    );
+  }
+}
+
+class _ScheduleOptionCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool enabled;
+  final ValueChanged<bool> onToggle;
+  final Widget child;
+
+  const _ScheduleOptionCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.enabled,
+    required this.onToggle,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+      decoration: BoxDecoration(
+        color: enabled
+            ? theme.colorScheme.primaryContainer.withValues(alpha: 0.28)
+            : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: enabled
+              ? theme.colorScheme.primary.withValues(alpha: 0.35)
+              : theme.colorScheme.outlineVariant.withValues(alpha: 0.55),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 18, color: theme.colorScheme.primary),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: theme.textTheme.titleSmall),
+                    Text(
+                      subtitle,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Switch(value: enabled, onChanged: onToggle),
+            ],
+          ),
+          const SizedBox(height: 12),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _IntervalEditor<T> extends StatelessWidget {
+  final bool enabled;
+  final TextEditingController valueController;
+  final VoidCallback onValueChanged;
+  final String valueLabel;
+  final String? valueErrorText;
+  final T selectedUnit;
+  final List<T> units;
+  final ValueChanged<T> onChanged;
+  final String Function(T unit) itemLabelBuilder;
+  final IconData icon;
+
+  const _IntervalEditor({
+    required this.enabled,
+    required this.valueController,
+    required this.onValueChanged,
+    required this.valueLabel,
+    required this.valueErrorText,
+    required this.selectedUnit,
+    required this.units,
+    required this.onChanged,
+    required this.itemLabelBuilder,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedOpacity(
+      opacity: enabled ? 1 : 0.56,
+      duration: const Duration(milliseconds: 180),
+      child: IgnorePointer(
+        ignoring: !enabled,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final stackFields = constraints.maxWidth < 260;
+
+            final valueField = TextField(
+              controller: valueController,
+              keyboardType: TextInputType.number,
+              onChanged: (_) => onValueChanged(),
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              decoration: InputDecoration(
+                labelText: valueLabel,
+                prefixIcon: Icon(icon),
+                errorText: valueErrorText,
+              ),
+            );
+
+            final unitField = DropdownButtonFormField<T>(
+              key: ValueKey<Object?>('${selectedUnit}_$enabled'),
+              initialValue: selectedUnit,
+              decoration: const InputDecoration(labelText: 'Unit'),
+              items: units
+                  .map(
+                    (unit) => DropdownMenuItem<T>(
+                      value: unit,
+                      child: Text(itemLabelBuilder(unit)),
+                    ),
+                  )
+                  .toList(),
+              onChanged: enabled
+                  ? (value) {
+                      if (value != null) {
+                        onChanged(value);
+                      }
+                    }
+                  : null,
+            );
+
+            if (stackFields) {
+              return Column(
+                children: [valueField, const SizedBox(height: 10), unitField],
+              );
+            }
+
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: valueField),
+                const SizedBox(width: 10),
+                Expanded(child: unitField),
+              ],
+            );
+          },
+        ),
+      ),
     );
   }
 }

@@ -234,12 +234,13 @@ class NotificationService {
 
     // Use a different ID for the reminder
     final id = (todo.id.hashCode.abs() + 1000000) % 2147483647;
+    final reminderLabel = todo.reminderLabel ?? todo.reminderString;
 
     try {
       await _plugin.zonedSchedule(
         id,
         '⏰ Upcoming: $projectTitle',
-        '${todo.title} (in ${todo.reminderString})',
+        '${todo.title} (in $reminderLabel)',
         scheduledDate,
         const NotificationDetails(
           android: AndroidNotificationDetails(
@@ -261,7 +262,7 @@ class NotificationService {
       await _plugin.zonedSchedule(
         id,
         '⏰ Upcoming: $projectTitle',
-        '${todo.title} (in ${todo.reminderString})',
+        '${todo.title} (in $reminderLabel)',
         scheduledDate,
         const NotificationDetails(
           android: AndroidNotificationDetails(
