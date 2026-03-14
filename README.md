@@ -129,7 +129,8 @@ Download the latest APK from:
 - project files you can open and edit outside the app
 - optional custom folder, including an Obsidian-friendly one
 - hidden metadata in HTML comments so the Markdown stays usable
-- reminders / local notifications
+- custom reminders / local notifications
+- recurring tasks with flexible intervals stored directly in Markdown metadata
 - D-Day project tracking
 - archive support
 - optional calendar sync
@@ -150,7 +151,7 @@ description: stop overthinking, start shipping
 sync_calendar: true
 ---
 
-- [ ] finish feature <!-- {"alarm":"2026-03-10T09:00:00.000","reminder":"1d"} -->
+- [ ] finish feature <!-- {"id":"0d6bc622-1f0f-4d61-9e1e-6a0adce3d52b","alarm":"2026-03-10T09:00:00.000","reminder":"2w","recurrence":{"frequency":"daily","interval":3}} -->
 - [x] stop pretending another app will fix my life
 ```
 

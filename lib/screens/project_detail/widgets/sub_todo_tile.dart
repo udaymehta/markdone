@@ -90,36 +90,31 @@ class SubTodoTile extends StatelessWidget {
                     ),
                     if (todo.alarm != null) ...[
                       const SizedBox(height: 4),
-                      Row(
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
-                          Icon(
-                            Icons.alarm_rounded,
-                            size: 13,
+                          _MetaChip(
+                            icon: Icons.alarm_rounded,
+                            label: DateFormat(
+                              'MMM d, h:mm a',
+                            ).format(todo.alarm!),
                             color: _alarmColor(context),
                           ),
-                          const SizedBox(width: 4),
-                          Text(
-                            DateFormat('MMM d, h:mm a').format(todo.alarm!),
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: _alarmColor(context),
-                              fontSize: 11,
-                            ),
-                          ),
-                          if (todo.reminderBefore != null) ...[
-                            const SizedBox(width: 8),
-                            Icon(
-                              Icons.notifications_active_outlined,
-                              size: 12,
+                          if (todo.reminderBefore != null)
+                            _MetaChip(
+                              icon: Icons.notifications_active_outlined,
+                              label:
+                                  '${todo.reminderLabel ?? todo.reminderString} before',
                               color: theme.colorScheme.onSurfaceVariant,
                             ),
-                            const SizedBox(width: 2),
-                            Text(
-                              '${todo.reminderString} before',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                fontSize: 11,
-                              ),
+                          if (todo.recurrence != null)
+                            _MetaChip(
+                              icon: Icons.repeat_rounded,
+                              label: todo.recurrence!.label,
+                              color: theme.colorScheme.secondary,
                             ),
-                          ],
                         ],
                       ),
                     ],
@@ -152,5 +147,44 @@ class SubTodoTile extends StatelessWidget {
       return Theme.of(context).colorScheme.error;
     }
     return Theme.of(context).colorScheme.primary;
+  }
+}
+
+class _MetaChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  const _MetaChip({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: theme.textTheme.bodySmall?.copyWith(
+              fontSize: 11,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

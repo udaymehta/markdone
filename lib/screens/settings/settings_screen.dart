@@ -39,7 +39,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   bool _permissionsChecked = false;
   Map<Permission, PermissionStatus> _permissionStatuses = {};
-
   @override
   void initState() {
     super.initState();
@@ -297,11 +296,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
           // ── About ──
           _SectionHeader(title: 'About'),
-          _SettingsTile(
-            icon: Icons.info_outline_rounded,
-            title: 'MarkDone!',
-            subtitle: 'v1.0.0(release)',
-          ),
           _SettingsTile(
             icon: Icons.link_rounded,
             title: 'GitHub Repo',

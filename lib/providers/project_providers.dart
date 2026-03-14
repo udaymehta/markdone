@@ -7,6 +7,7 @@ import '../models/sub_todo.dart';
 import '../services/file_service.dart';
 import '../services/notification_service.dart';
 import '../services/calendar_service.dart';
+import '../services/recurrence_service.dart';
 import 'settings_providers.dart';
 
 // --- Service providers ---
@@ -263,6 +264,88 @@ class ProjectsNotifier extends AsyncNotifier<List<MasterProject>> {
     }
   }
 
+  Future<SubTodo> _prepareTodoForSave({
+    required SubTodo todo,
+    required MasterProject project,
+    SubTodo? previousTodo,
+  }) async {
+    final normalizedTodo = todo.normalizedSchedule();
+    final notifService = ref.read(notificationServiceProvider);
+
+    await notifService.cancelSubTodoNotifications(normalizedTodo);
+
+    final todoForCleanup = previousTodo ?? normalizedTodo;
+
+    if (normalizedTodo.isCompleted || normalizedTodo.alarm == null) {
+      await _removeTodoFromCalendar(todoForCleanup);
+      return normalizedTodo.copyWith(clearCalendarEventId: true);
+    }
+
+    final syncedTodo = await _syncTodoToCalendar(
+      todo: normalizedTodo,
+      project: project,
+    );
+
+    await notifService.scheduleSubTodoAlarm(
+      todo: syncedTodo,
+      projectTitle: project.title,
+      projectFilePath: project.filePath,
+    );
+    await notifService.scheduleSubTodoReminder(
+      todo: syncedTodo,
+      projectTitle: project.title,
+      projectFilePath: project.filePath,
+    );
+
+    return syncedTodo;
+  }
+
+  Future<MasterProject> _persistProjectUpdate({
+    required MasterProject project,
+    required List<SubTodo> todos,
+  }) async {
+    final preparedTodos = <SubTodo>[];
+    for (var index = 0; index < todos.length; index++) {
+      final withLineIndex = todos[index].copyWith(lineIndex: index);
+      final previousTodo = project.todos
+          .where((todo) => todo.id == withLineIndex.id)
+          .firstOrNull;
+      final preparedTodo = await _prepareTodoForSave(
+        todo: withLineIndex,
+        project: project,
+        previousTodo: previousTodo,
+      );
+      preparedTodos.add(preparedTodo.copyWith(lineIndex: index));
+    }
+
+    final updatedProject = project.copyWith(todos: preparedTodos);
+    final fileService = ref.read(fileServiceProvider);
+    await fileService.writeProject(updatedProject);
+    return updatedProject;
+  }
+
+  SubTodo _advanceRecurringTodo(SubTodo todo) {
+    final alarm = todo.alarm;
+    final recurrence = todo.recurrence;
+    if (alarm == null || recurrence == null) return todo;
+
+    final now = DateTime.now();
+    final advanceAfter = alarm.isAfter(now) ? alarm : now;
+
+    final nextAlarm = RecurrenceService.nextOccurrence(
+      alarm: alarm,
+      rule: recurrence,
+      after: advanceAfter,
+    );
+    if (nextAlarm == null) return todo;
+
+    return todo.copyWith(
+      isCompleted: false,
+      alarm: nextAlarm,
+      recurrence: recurrence.retargetToAlarm(alarm),
+    );
+  }
+
   /// Reloads all projects from disk.
   Future<void> reload() async {
     state = const AsyncLoading();
@@ -361,48 +444,17 @@ class ProjectsNotifier extends AsyncNotifier<List<MasterProject>> {
     if (todoIdx < 0) return;
 
     final todo = project.todos[todoIdx];
-    final updatedTodo = todo.copyWith(isCompleted: !todo.isCompleted);
+    final toggledCompleted = !todo.isCompleted;
+    final updatedTodo = toggledCompleted && todo.isRecurring
+        ? _advanceRecurringTodo(todo)
+        : todo.copyWith(isCompleted: toggledCompleted);
 
     final updatedTodos = List<SubTodo>.from(project.todos);
     updatedTodos[todoIdx] = updatedTodo;
-
-    var updatedProject = project.copyWith(todos: updatedTodos);
-
-    // Write to file
-    final fileService = ref.read(fileServiceProvider);
-    await fileService.writeProject(updatedProject);
-
-    // Update notifications
-    final notifService = ref.read(notificationServiceProvider);
-    if (updatedTodo.isCompleted) {
-      await notifService.cancelSubTodoNotifications(updatedTodo);
-      // Remove calendar event when completing
-      await _removeTodoFromCalendar(updatedTodo);
-    } else {
-      // Re-sync to calendar when un-completing
-      final syncedTodo = await _syncTodoToCalendar(
-        todo: updatedTodo,
-        project: project,
-      );
-      if (syncedTodo.calendarEventId != updatedTodo.calendarEventId) {
-        // Update the todo list with new calendarEventId
-        final idx = updatedTodos.indexWhere((t) => t.id == syncedTodo.id);
-        if (idx >= 0) updatedTodos[idx] = syncedTodo;
-        updatedProject = project.copyWith(todos: updatedTodos);
-        final fileService2 = ref.read(fileServiceProvider);
-        await fileService2.writeProject(updatedProject);
-      }
-      await notifService.scheduleSubTodoAlarm(
-        todo: updatedTodo,
-        projectTitle: project.title,
-        projectFilePath: project.filePath,
-      );
-      await notifService.scheduleSubTodoReminder(
-        todo: updatedTodo,
-        projectTitle: project.title,
-        projectFilePath: project.filePath,
-      );
-    }
+    final updatedProject = await _persistProjectUpdate(
+      project: project,
+      todos: updatedTodos,
+    );
 
     // Optimistic update
     final updatedProjects = List<MasterProject>.from(current);
@@ -417,26 +469,10 @@ class ProjectsNotifier extends AsyncNotifier<List<MasterProject>> {
     if (projectIdx < 0) return;
 
     final project = current[projectIdx];
-
-    // Sync to calendar if enabled
-    final syncedTodo = await _syncTodoToCalendar(todo: todo, project: project);
-
-    final updatedTodos = List<SubTodo>.from(project.todos)..add(syncedTodo);
-    final updatedProject = project.copyWith(todos: updatedTodos);
-
-    final fileService = ref.read(fileServiceProvider);
-    await fileService.writeProject(updatedProject);
-
-    final notifService = ref.read(notificationServiceProvider);
-    await notifService.scheduleSubTodoAlarm(
-      todo: syncedTodo,
-      projectTitle: project.title,
-      projectFilePath: project.filePath,
-    );
-    await notifService.scheduleSubTodoReminder(
-      todo: syncedTodo,
-      projectTitle: project.title,
-      projectFilePath: project.filePath,
+    final updatedTodos = List<SubTodo>.from(project.todos)..add(todo);
+    final updatedProject = await _persistProjectUpdate(
+      project: project,
+      todos: updatedTodos,
     );
 
     final updatedProjects = List<MasterProject>.from(current);
@@ -454,33 +490,12 @@ class ProjectsNotifier extends AsyncNotifier<List<MasterProject>> {
     final todoIdx = project.todos.indexWhere((t) => t.id == updatedTodo.id);
     if (todoIdx < 0) return;
 
-    // Sync to calendar if enabled
-    final syncedTodo = await _syncTodoToCalendar(
-      todo: updatedTodo,
-      project: project,
-    );
-
     final updatedTodos = List<SubTodo>.from(project.todos);
-    updatedTodos[todoIdx] = syncedTodo;
-    final updatedProject = project.copyWith(todos: updatedTodos);
-
-    final fileService = ref.read(fileServiceProvider);
-    await fileService.writeProject(updatedProject);
-
-    final notifService = ref.read(notificationServiceProvider);
-    await notifService.cancelSubTodoNotifications(syncedTodo);
-    if (!syncedTodo.isCompleted && syncedTodo.alarm != null) {
-      await notifService.scheduleSubTodoAlarm(
-        todo: syncedTodo,
-        projectTitle: project.title,
-        projectFilePath: project.filePath,
-      );
-      await notifService.scheduleSubTodoReminder(
-        todo: syncedTodo,
-        projectTitle: project.title,
-        projectFilePath: project.filePath,
-      );
-    }
+    updatedTodos[todoIdx] = updatedTodo;
+    final updatedProject = await _persistProjectUpdate(
+      project: project,
+      todos: updatedTodos,
+    );
 
     final updatedProjects = List<MasterProject>.from(current);
     updatedProjects[projectIdx] = updatedProject;
@@ -502,10 +517,10 @@ class ProjectsNotifier extends AsyncNotifier<List<MasterProject>> {
     await _removeTodoFromCalendar(todo);
 
     final updatedTodos = project.todos.where((t) => t.id != todoId).toList();
-    final updatedProject = project.copyWith(todos: updatedTodos);
-
-    final fileService = ref.read(fileServiceProvider);
-    await fileService.writeProject(updatedProject);
+    final updatedProject = await _persistProjectUpdate(
+      project: project,
+      todos: updatedTodos,
+    );
 
     final updatedProjects = List<MasterProject>.from(current);
     updatedProjects[projectIdx] = updatedProject;
