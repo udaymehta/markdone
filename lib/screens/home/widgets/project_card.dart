@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../core/color_utils.dart';
+import '../../../core/date_formatters.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../models/master_project.dart';
 import '../../../models/sub_todo.dart';
@@ -26,21 +28,32 @@ class ProjectCard extends StatelessWidget {
     }
   }
 
+  /// Parses bgColor and returns a very subtle tint suitable for card background.
+  /// The stored alpha is halved further so the card tint is barely visible.
+  Color? _cardBgTint(Color cardBase) {
+    final parsed = parseBgColor(project.bgColor);
+    if (parsed == null) return null;
+    // Use half the stored alpha for a subtle card tint
+    final tintAlpha = (parsed.a * 0.5).clamp(0.0, 0.15);
+    return Color.lerp(cardBase, parsed.withValues(alpha: 1.0), tintAlpha);
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final projectColor = _projectColor ?? theme.colorScheme.primary;
+    final cardBg = _cardBgTint(theme.cardColor) ?? theme.cardColor;
     final previewTodos = _previewTodos;
 
     return GestureDetector(
       onTap: onTap,
       onLongPress: onLongPress,
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
-        padding: const EdgeInsets.all(18),
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          color: theme.cardColor,
-          borderRadius: BorderRadius.circular(16),
+          color: cardBg,
+          borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: theme.dividerTheme.color ?? Colors.transparent,
           ),
@@ -48,18 +61,18 @@ class ProjectCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Title row
+            // Title row with optional D-day badge inline
             Row(
               children: [
                 Container(
-                  width: 4,
+                  width: 3,
                   height: 20,
                   decoration: BoxDecoration(
                     color: projectColor,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     project.title,
@@ -68,6 +81,14 @@ class ProjectCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
+                if (project.isCompletedProject) ...[
+                  const SizedBox(width: 8),
+                  Icon(
+                    Icons.task_alt_rounded,
+                    size: 16,
+                    color: theme.colorScheme.tertiary,
+                  ),
+                ],
                 if (project.dday != null) ...[
                   const SizedBox(width: 8),
                   _DdayBadge(project: project),
@@ -75,31 +96,22 @@ class ProjectCard extends StatelessWidget {
               ],
             ),
 
-            if (project.isCompletedProject) ...[
-              const SizedBox(height: 10),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.tertiary.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
-                ),
+            // Due date inline text (below title, compact)
+            if (project.dday != null) ...[
+              Padding(
+                padding: const EdgeInsets.only(left: 11, top: 4),
                 child: Row(
-                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
-                      Icons.task_alt_rounded,
-                      size: 16,
-                      color: theme.colorScheme.tertiary,
+                      Icons.event_rounded,
+                      size: 12,
+                      color: theme.colorScheme.onSurfaceVariant,
                     ),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: 4),
                     Text(
-                      'Completed',
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        color: theme.colorScheme.tertiary,
-                        fontWeight: FontWeight.w700,
+                      MarkdoneDateFormatter.formatDate(project.dday!),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
                   ],
@@ -110,74 +122,83 @@ class ProjectCard extends StatelessWidget {
             if (project.description != null &&
                 project.description!.isNotEmpty) ...[
               const SizedBox(height: 8),
-              Text(
-                project.description!,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodyMedium,
+              Padding(
+                padding: const EdgeInsets.only(left: 11),
+                child: Text(
+                  project.description!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodySmall,
+                ),
               ),
             ],
 
             if (previewTodos.isNotEmpty) ...[
-              const SizedBox(height: 14),
-              Column(
-                children: [
-                  for (final todo in previewTodos)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Row(
-                        children: [
-                          Icon(
-                            todo.isCompleted
-                                ? Icons.check_box_rounded
-                                : Icons.check_box_outline_blank_rounded,
-                            size: 16,
-                            color: todo.isCompleted
-                                ? theme.colorScheme.primary
-                                : theme.colorScheme.onSurfaceVariant,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              todo.title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                decoration: todo.isCompleted
-                                    ? TextDecoration.lineThrough
-                                    : null,
-                                color: todo.isCompleted
-                                    ? theme.colorScheme.onSurfaceVariant
-                                          .withValues(alpha: 0.75)
-                                    : theme.colorScheme.onSurface,
+              const SizedBox(height: 10),
+              for (final todo in previewTodos)
+                Padding(
+                  padding: const EdgeInsets.only(left: 11, bottom: 4),
+                  child: Row(
+                    children: [
+                      Icon(
+                        todo.isCompleted
+                            ? Icons.check_circle_rounded
+                            : Icons.radio_button_unchecked_rounded,
+                        size: 14,
+                        color: todo.isCompleted
+                            ? theme.colorScheme.primary.withValues(alpha: 0.6)
+                            : theme.colorScheme.onSurfaceVariant.withValues(
+                                alpha: 0.5,
                               ),
-                            ),
-                          ),
-                        ],
                       ),
-                    ),
-                ],
-              ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          todo.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontSize: 12,
+                            decoration: todo.isCompleted
+                                ? TextDecoration.lineThrough
+                                : null,
+                            color: todo.isCompleted
+                                ? theme.colorScheme.onSurfaceVariant.withValues(
+                                    alpha: 0.5,
+                                  )
+                                : theme.colorScheme.onSurface.withValues(
+                                    alpha: 0.8,
+                                  ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
             ],
 
             if (project.todos.isNotEmpty) ...[
-              const SizedBox(height: 14),
-              // Progress bar
-              _ProgressBar(progress: project.progress, color: projectColor),
-              const SizedBox(height: 8),
-              // Stats row
+              const SizedBox(height: 10),
+              // Progress row: bar + stats inline
               Row(
                 children: [
-                  Text(
-                    '${project.completedCount}/${project.todos.length} done',
-                    style: theme.textTheme.bodySmall,
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(3),
+                      child: LinearProgressIndicator(
+                        value: project.progress,
+                        minHeight: 4,
+                        backgroundColor: projectColor.withValues(alpha: 0.10),
+                        valueColor: AlwaysStoppedAnimation(projectColor),
+                      ),
+                    ),
                   ),
-                  const Spacer(),
+                  const SizedBox(width: 10),
                   Text(
-                    '${(project.progress * 100).toStringAsFixed(0)}%',
+                    '${project.completedCount}/${project.todos.length}',
                     style: theme.textTheme.labelSmall?.copyWith(
-                      color: projectColor,
-                      fontWeight: FontWeight.w700,
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontSize: 11,
                     ),
                   ),
                 ],
@@ -207,26 +228,7 @@ class ProjectCard extends StatelessWidget {
   }
 }
 
-class _ProgressBar extends StatelessWidget {
-  final double progress;
-  final Color color;
-
-  const _ProgressBar({required this.progress, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(4),
-      child: LinearProgressIndicator(
-        value: progress,
-        minHeight: 6,
-        backgroundColor: color.withValues(alpha: 0.12),
-        valueColor: AlwaysStoppedAnimation(color),
-      ),
-    );
-  }
-}
-
+/// Compact D-day pill badge shown inline in the title row.
 class _DdayBadge extends StatelessWidget {
   final MasterProject project;
   const _DdayBadge({required this.project});
@@ -257,9 +259,9 @@ class _DdayBadge extends StatelessWidget {
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.15),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Text(
@@ -268,6 +270,7 @@ class _DdayBadge extends StatelessWidget {
           fontSize: 11,
           fontWeight: FontWeight.w700,
           color: color,
+          height: 1.1,
         ),
       ),
     );

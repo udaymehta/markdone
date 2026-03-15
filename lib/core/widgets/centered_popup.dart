@@ -41,7 +41,7 @@ class CenteredPopupContent extends StatelessWidget {
   const CenteredPopupContent({
     super.key,
     required this.child,
-    this.padding = const EdgeInsets.all(24),
+    this.padding = const EdgeInsets.all(20),
     this.scrollable = true,
   });
 

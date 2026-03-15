@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
+import '../../core/color_utils.dart';
+import '../../core/date_formatters.dart';
+import '../../core/theme/app_theme.dart';
 import '../../core/widgets/centered_popup.dart';
 import '../../models/master_project.dart';
 import '../../models/sub_todo.dart';
@@ -20,6 +22,13 @@ class ProjectDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
+  bool _sortByDueDate = false;
+
+  /// Local copy of pending todos for optimistic drag-reorder.
+  /// When non-null, this takes precedence over the provider snapshot
+  /// to avoid flicker between drag-end and async persist.
+  List<SubTodo>? _localPendingTodos;
+
   Future<void> _queueArchive(MasterProject project) async {
     final messenger = ScaffoldMessenger.of(context);
     messenger.clearSnackBars();
@@ -83,16 +92,25 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       );
     }
 
-    final pendingTodos = project.todos.where((t) => !t.isCompleted).toList()
-      ..sort((a, b) {
-        // Sort by alarm date: tasks with alarms first, then by alarm time
-        if (a.alarm != null && b.alarm != null) {
-          return a.alarm!.compareTo(b.alarm!);
-        }
-        if (a.alarm != null) return -1;
-        if (b.alarm != null) return 1;
-        return 0;
-      });
+    final providerPendingTodos =
+        project.todos.where((t) => !t.isCompleted).toList()..sort((a, b) {
+          if (_sortByDueDate) {
+            if (a.alarm != null && b.alarm != null) {
+              return a.alarm!.compareTo(b.alarm!);
+            }
+            if (a.alarm != null) return -1;
+            if (b.alarm != null) return 1;
+            return 0;
+          } else {
+            final aOrder = a.sortOrder ?? a.lineIndex;
+            final bOrder = b.sortOrder ?? b.lineIndex;
+            return aOrder.compareTo(bOrder);
+          }
+        });
+
+    // Use local optimistic list if available (drag-reorder in progress),
+    // otherwise fall back to provider snapshot and clear local override.
+    final pendingTodos = _localPendingTodos ?? providerPendingTodos;
 
     final hideCompleted = ref.watch(hideCompletedProvider);
     final completedTodos = project.todos.where((t) => t.isCompleted).toList()
@@ -105,8 +123,20 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
         return 0;
       });
 
+    // Project background tint
+    final bgTint = parseBgColor(project.bgColor);
+    final scaffoldBg = bgTint != null
+        ? Color.lerp(
+            theme.scaffoldBackgroundColor,
+            bgTint.withValues(alpha: 1.0),
+            bgTint.a,
+          )
+        : null;
+
     return Scaffold(
+      backgroundColor: scaffoldBg,
       appBar: AppBar(
+        backgroundColor: scaffoldBg,
         title: Text(project.title),
         actions: [
           if (project.dday != null)
@@ -200,6 +230,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                   total: project.todos.length,
                   completed: project.completedCount,
                   progress: project.progress,
+                  bgTint: bgTint,
                 ),
               ),
             ),
@@ -208,33 +239,142 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           if (pendingTodos.isNotEmpty)
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
-                child: Text(
-                  'To Do',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
+                padding: const EdgeInsets.fromLTRB(20, 16, 12, 4),
+                child: Row(
+                  children: [
+                    Text(
+                      'To Do',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const Spacer(),
+                    GestureDetector(
+                      onTap: () =>
+                          setState(() => _sortByDueDate = !_sortByDueDate),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _sortByDueDate
+                              ? theme.colorScheme.primary.withValues(
+                                  alpha: 0.12,
+                                )
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: _sortByDueDate
+                                ? theme.colorScheme.primary.withValues(
+                                    alpha: 0.4,
+                                  )
+                                : theme.colorScheme.onSurfaceVariant.withValues(
+                                    alpha: 0.2,
+                                  ),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              _sortByDueDate
+                                  ? Icons.sort_rounded
+                                  : Icons.drag_handle_rounded,
+                              size: 14,
+                              color: _sortByDueDate
+                                  ? theme.colorScheme.primary
+                                  : theme.colorScheme.onSurfaceVariant,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              _sortByDueDate ? 'Due date' : 'Custom',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: _sortByDueDate
+                                    ? theme.colorScheme.primary
+                                    : theme.colorScheme.onSurfaceVariant,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
 
           // Pending tasks
-          SliverList(
-            delegate: SliverChildBuilderDelegate((context, index) {
-              final todo = pendingTodos[index];
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: SubTodoTile(
-                  todo: todo,
-                  onToggle: () => _handleToggleTodo(project, todo),
-                  onTap: () => _showEditTodoSheet(context, todo),
-                  onDismissed: () => ref
-                      .read(projectsProvider.notifier)
-                      .removeTodo(widget.filePath, todo.id),
-                ),
-              );
-            }, childCount: pendingTodos.length),
-          ),
+          if (_sortByDueDate)
+            SliverList(
+              delegate: SliverChildBuilderDelegate((context, index) {
+                final todo = pendingTodos[index];
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: SubTodoTile(
+                    todo: todo,
+                    projectDday: project.dday,
+                    onToggle: () => _handleToggleTodo(project, todo),
+                    onTap: () => _showEditTodoSheet(context, todo),
+                    onDismissed: () => ref
+                        .read(projectsProvider.notifier)
+                        .removeTodo(widget.filePath, todo.id),
+                  ),
+                );
+              }, childCount: pendingTodos.length),
+            )
+          else
+            SliverReorderableList(
+              itemCount: pendingTodos.length,
+              onReorder: (oldIndex, newIndex) {
+                // Optimistic local update to prevent flicker
+                final adjusted = newIndex > oldIndex ? newIndex - 1 : newIndex;
+                final reordered = List<SubTodo>.from(pendingTodos);
+                final item = reordered.removeAt(oldIndex);
+                reordered.insert(adjusted, item);
+                setState(() => _localPendingTodos = reordered);
+
+                // Fire async persist, then clear local override
+                ref
+                    .read(projectsProvider.notifier)
+                    .reorderTodo(widget.filePath, oldIndex, newIndex)
+                    .whenComplete(() {
+                      if (mounted) {
+                        setState(() => _localPendingTodos = null);
+                      }
+                    });
+              },
+              itemBuilder: (context, index) {
+                final todo = pendingTodos[index];
+                return Padding(
+                  key: ValueKey(todo.id),
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: SubTodoTile(
+                    todo: todo,
+                    projectDday: project.dday,
+                    onToggle: () => _handleToggleTodo(project, todo),
+                    onTap: () => _showEditTodoSheet(context, todo),
+                    onDismissed: () => ref
+                        .read(projectsProvider.notifier)
+                        .removeTodo(widget.filePath, todo.id),
+                    dragHandle: ReorderableDragStartListener(
+                      index: index,
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 10),
+                        child: Icon(
+                          Icons.reorder_rounded,
+                          size: 18,
+                          color: theme.colorScheme.onSurfaceVariant.withValues(
+                            alpha: 0.35,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
 
           // Completed tasks header
           if (completedTodos.isNotEmpty && !hideCompleted)
@@ -268,6 +408,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 8),
                   child: SubTodoTile(
                     todo: todo,
+                    projectDday: project.dday,
                     onToggle: () => _handleToggleTodo(project, todo),
                     onTap: () => _showEditTodoSheet(context, todo),
                     onDismissed: () => ref
@@ -283,7 +424,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showAddTodoSheet(context),
-        child: const Icon(Icons.add_rounded),
+        child: const Icon(Icons.add_rounded, size: 28),
       ),
     );
   }
@@ -381,11 +522,14 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                   isEditing ? 'Edit Task' : 'New Task',
                   style: theme.textTheme.headlineSmall,
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 14),
+                // Task name
                 TextField(
                   controller: titleController,
                   autofocus: !isEditing,
                   onChanged: (_) => setSheetState(() {}),
+                  maxLines: null,
+                  minLines: 1,
                   decoration: InputDecoration(
                     hintText: 'Task name',
                     prefixIcon: Icon(
@@ -393,262 +537,158 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                           ? Icons.edit_outlined
                           : Icons.check_circle_outline_rounded,
                     ),
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 12,
+                    ),
                   ),
                   textCapitalization: TextCapitalization.sentences,
                 ),
-                const SizedBox(height: 16),
-                Text('Schedule', style: theme.textTheme.titleSmall),
-                const SizedBox(height: 8),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () async {
-                          final date = await showDatePicker(
-                            context: ctx,
-                            initialDate: alarm ?? DateTime.now(),
-                            firstDate: DateTime.now().subtract(
-                              const Duration(days: 1),
-                            ),
-                            lastDate: DateTime.now().add(
-                              const Duration(days: 3650),
-                            ),
+                const SizedBox(height: 10),
+                _CompactScheduleSection(
+                  theme: theme,
+                  alarm: alarm,
+                  onAlarmRemoved: () => setSheetState(() {
+                    alarm = null;
+                    reminderEnabled = false;
+                    recurrenceEnabled = false;
+                    addToCalendar = false;
+                  }),
+                  onAlarmDateTap: () async {
+                    if (!ctx.mounted) return;
+                    final date = await showDatePicker(
+                      context: ctx,
+                      initialDate: alarm ?? DateTime.now(),
+                      firstDate: DateTime.now().subtract(
+                        const Duration(days: 1),
+                      ),
+                      lastDate: DateTime.now().add(const Duration(days: 3650)),
+                    );
+                    if (date != null && ctx.mounted) {
+                      final time = await showTimePicker(
+                        context: ctx,
+                        initialTime: alarm != null
+                            ? TimeOfDay.fromDateTime(alarm!)
+                            : TimeOfDay.now(),
+                      );
+                      if (time != null) {
+                        setSheetState(() {
+                          final hadAlarm = alarm != null;
+                          alarm = DateTime(
+                            date.year,
+                            date.month,
+                            date.day,
+                            time.hour,
+                            time.minute,
                           );
-                          if (date != null && ctx.mounted) {
-                            final time = await showTimePicker(
-                              context: ctx,
-                              initialTime: alarm != null
-                                  ? TimeOfDay.fromDateTime(alarm!)
-                                  : TimeOfDay.now(),
-                            );
-                            if (time != null) {
-                              setSheetState(() {
-                                final hadAlarm = alarm != null;
-                                alarm = DateTime(
-                                  date.year,
-                                  date.month,
-                                  date.day,
-                                  time.hour,
-                                  time.minute,
-                                );
-                                if (!hadAlarm) {
-                                  reminderEnabled = true;
-                                  if (_parsePositiveInt(
-                                        reminderValueController.text,
-                                      ) ==
-                                      null) {
-                                    reminderValueController.text = '30';
-                                  }
-                                }
-                                if (!hadAlarm && canSyncTaskToCalendar) {
-                                  addToCalendar = true;
-                                }
-                              });
-                            }
-                          }
-                        },
-                        icon: Icon(
-                          isEditing
-                              ? Icons.notifications_outlined
-                              : Icons.alarm_rounded,
-                          size: 18,
-                        ),
-                        label: Text(
-                          alarm != null
-                              ? DateFormat('EEE, MMM d - h:mm a').format(alarm!)
-                              : 'Set alarm',
-                        ),
-                      ),
-                    ),
-                    if (alarm != null) ...[
-                      const SizedBox(width: 8),
-                      IconButton(
-                        icon: Icon(
-                          Icons.clear_rounded,
-                          color: theme.colorScheme.error,
-                        ),
-                        tooltip: 'Clear alarm',
-                        onPressed: () => setSheetState(() {
-                          alarm = null;
-                          reminderEnabled = false;
-                          recurrenceEnabled = false;
-                          addToCalendar = false;
-                        }),
-                      ),
-                    ],
-                  ],
-                ),
-                if (alarm != null) ...[
-                  const SizedBox(height: 12),
-                  LayoutBuilder(
-                    builder: (context, constraints) {
-                      final isWide = constraints.maxWidth >= 420;
-                      final reminderCard = _ScheduleOptionCard(
-                        icon: Icons.notifications_active_outlined,
-                        title: 'Reminder',
-                        subtitle: 'Before the alarm',
-                        enabled: reminderEnabled,
-                        onToggle: (enabled) {
-                          setSheetState(() {
-                            reminderEnabled = enabled;
-                            if (enabled &&
-                                _parsePositiveInt(
-                                      reminderValueController.text,
-                                    ) ==
-                                    null) {
+                          if (!hadAlarm) {
+                            reminderEnabled = true;
+                            if (_parsePositiveInt(
+                                  reminderValueController.text,
+                                ) ==
+                                null) {
                               reminderValueController.text = '30';
                             }
-                          });
-                        },
-                        child: _IntervalEditor<ReminderUnit>(
-                          enabled: reminderEnabled,
-                          valueController: reminderValueController,
-                          onValueChanged: () => setSheetState(() {}),
-                          valueLabel: 'Amount',
-                          valueErrorText: reminderError,
-                          selectedUnit: reminderUnit,
-                          units: ReminderUnit.values,
-                          onChanged: (value) =>
-                              setSheetState(() => reminderUnit = value),
-                          itemLabelBuilder: (unit) =>
-                              _capitalize(unit.pluralUnit),
-                          icon: Icons.timelapse_rounded,
-                        ),
-                      );
-                      final repeatCard = _ScheduleOptionCard(
-                        icon: Icons.repeat_rounded,
-                        title: 'Repeat',
-                        subtitle: 'Next occurrence rule',
-                        enabled: recurrenceEnabled,
-                        onToggle: (enabled) {
-                          setSheetState(() {
-                            recurrenceEnabled = enabled;
-                            if (enabled &&
-                                _parsePositiveInt(
-                                      recurrenceIntervalController.text,
-                                    ) ==
-                                    null) {
-                              recurrenceIntervalController.text = '1';
-                            }
-                          });
-                        },
-                        child: _IntervalEditor<RecurrenceFrequency>(
-                          enabled: recurrenceEnabled,
-                          valueController: recurrenceIntervalController,
-                          onValueChanged: () => setSheetState(() {}),
-                          valueLabel: 'Every',
-                          valueErrorText: recurrenceError,
-                          selectedUnit: recurrenceFrequency,
-                          units: RecurrenceFrequency.values,
-                          onChanged: (value) =>
-                              setSheetState(() => recurrenceFrequency = value),
-                          itemLabelBuilder: (frequency) =>
-                              _capitalize(frequency.pluralUnit),
-                          icon: Icons.schedule_rounded,
-                        ),
-                      );
-
-                      if (isWide) {
-                        return Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(child: reminderCard),
-                            const SizedBox(width: 12),
-                            Expanded(child: repeatCard),
-                          ],
-                        );
+                          }
+                          if (!hadAlarm && canSyncTaskToCalendar) {
+                            addToCalendar = true;
+                          }
+                        });
                       }
-
-                      return Column(
-                        children: [
-                          reminderCard,
-                          const SizedBox(height: 12),
-                          repeatCard,
-                        ],
-                      );
-                    },
-                  ),
-                  if (scheduleValidation != null) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      scheduleValidation,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.error,
-                      ),
-                    ),
-                  ],
-                ] else ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    'Set an alarm to unlock custom reminders and repeat intervals.',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-                if (alarm != null && canSyncTaskToCalendar) ...[
-                  const SizedBox(height: 12),
-                  CheckboxListTile(
-                    value: addToCalendar,
-                    onChanged: (value) =>
-                        setSheetState(() => addToCalendar = value ?? false),
-                    title: const Text('Add to calendar'),
-                    subtitle: const Text(
-                      'Turn this off to keep the schedule inside the app only.',
-                    ),
-                    secondary: const Icon(Icons.event_outlined),
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                    controlAffinity: ListTileControlAffinity.leading,
-                  ),
-                ],
-                const SizedBox(height: 20),
+                    }
+                  },
+                  reminderEnabled: reminderEnabled,
+                  onReminderToggle: (enabled) {
+                    setSheetState(() {
+                      reminderEnabled = enabled;
+                      if (enabled &&
+                          _parsePositiveInt(reminderValueController.text) ==
+                              null) {
+                        reminderValueController.text = '30';
+                      }
+                    });
+                  },
+                  reminderValueController: reminderValueController,
+                  onReminderValueChanged: () => setSheetState(() {}),
+                  reminderUnit: reminderUnit,
+                  onReminderUnitChanged: (unit) =>
+                      setSheetState(() => reminderUnit = unit),
+                  reminderError: reminderError,
+                  recurrenceEnabled: recurrenceEnabled,
+                  onRecurrenceToggle: (enabled) {
+                    setSheetState(() {
+                      recurrenceEnabled = enabled;
+                      if (enabled &&
+                          _parsePositiveInt(
+                                recurrenceIntervalController.text,
+                              ) ==
+                              null) {
+                        recurrenceIntervalController.text = '1';
+                      }
+                    });
+                  },
+                  recurrenceIntervalController: recurrenceIntervalController,
+                  onRecurrenceValueChanged: () => setSheetState(() {}),
+                  recurrenceFrequency: recurrenceFrequency,
+                  onRecurrenceFreqChanged: (freq) =>
+                      setSheetState(() => recurrenceFrequency = freq),
+                  recurrenceError: recurrenceError,
+                  scheduleValidation: scheduleValidation,
+                  showCalendarSync: canSyncTaskToCalendar,
+                  calendarSyncValue: addToCalendar,
+                  onCalendarSyncChanged: (value) =>
+                      setSheetState(() => addToCalendar = value),
+                ),
+                const SizedBox(height: 16),
+                // Delete + Save buttons (equal width)
                 Row(
                   children: [
                     if (isEditing) ...[
-                      OutlinedButton.icon(
-                        onPressed: () async {
-                          final shouldDelete = await showDialog<bool>(
-                            context: ctx,
-                            builder: (dialogCtx) => AlertDialog(
-                              title: const Text('Delete Task'),
-                              content: Text(
-                                'Delete "${existingTodo.title}"? This cannot be undone.',
-                              ),
-                              actions: [
-                                TextButton(
-                                  onPressed: () =>
-                                      Navigator.pop(dialogCtx, false),
-                                  child: const Text('Cancel'),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () async {
+                            final shouldDelete = await showDialog<bool>(
+                              context: ctx,
+                              builder: (dialogCtx) => AlertDialog(
+                                title: const Text('Delete Task'),
+                                content: Text(
+                                  'Delete "${existingTodo.title}"? This cannot be undone.',
                                 ),
-                                TextButton(
-                                  onPressed: () =>
-                                      Navigator.pop(dialogCtx, true),
-                                  child: Text(
-                                    'Delete',
-                                    style: TextStyle(
-                                      color: Theme.of(
-                                        dialogCtx,
-                                      ).colorScheme.error,
+                                actions: [
+                                  TextButton(
+                                    onPressed: () =>
+                                        Navigator.pop(dialogCtx, false),
+                                    child: const Text('Cancel'),
+                                  ),
+                                  TextButton(
+                                    onPressed: () =>
+                                        Navigator.pop(dialogCtx, true),
+                                    child: Text(
+                                      'Delete',
+                                      style: TextStyle(
+                                        color: Theme.of(
+                                          dialogCtx,
+                                        ).colorScheme.error,
+                                      ),
                                     ),
                                   ),
-                                ),
-                              ],
-                            ),
-                          );
+                                ],
+                              ),
+                            );
 
-                          if (shouldDelete != true) return;
+                            if (shouldDelete != true) return;
 
-                          await ref
-                              .read(projectsProvider.notifier)
-                              .removeTodo(widget.filePath, existingTodo.id);
-                          if (ctx.mounted) {
-                            Navigator.pop(ctx);
-                          }
-                        },
-                        icon: const Icon(Icons.delete_outline_rounded),
-                        label: const Text('Delete'),
+                            await ref
+                                .read(projectsProvider.notifier)
+                                .removeTodo(widget.filePath, existingTodo.id);
+                            if (ctx.mounted) {
+                              Navigator.pop(ctx);
+                            }
+                          },
+                          icon: const Icon(Icons.delete_outline_rounded),
+                          label: const Text('Delete'),
+                        ),
                       ),
                       const SizedBox(width: 12),
                     ],
@@ -729,11 +769,6 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     return parsed;
   }
 
-  static String _capitalize(String value) {
-    if (value.isEmpty) return value;
-    return '${value[0].toUpperCase()}${value.substring(1)}';
-  }
-
   static String? _scheduleValidationMessage({
     ReminderConfig? reminder,
     RecurrenceRule? recurrence,
@@ -765,6 +800,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     );
     DateTime? dday = project.dday;
     bool syncWithCalendar = project.syncWithCalendar;
+    Color? bgColor = parseBgColor(project.bgColor);
 
     // Check if calendar sync is globally enabled
     final calSyncEnabled = ref.read(calendarSyncEnabledProvider);
@@ -780,82 +816,273 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text('Edit Project', style: theme.textTheme.headlineSmall),
-                const SizedBox(height: 20),
+                const SizedBox(height: 14),
+                // Title field
                 TextField(
                   controller: titleController,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     hintText: 'Project name',
-                    prefixIcon: Icon(Icons.folder_outlined),
+                    prefixIcon: const Icon(Icons.folder_outlined),
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 12,
+                    ),
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 10),
+                // Description field (compact)
                 TextField(
                   controller: descController,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     hintText: 'Description',
-                    prefixIcon: Icon(Icons.notes_rounded),
+                    prefixIcon: const Icon(Icons.notes_rounded),
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
                   ),
                   maxLines: 2,
+                  minLines: 1,
                 ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () async {
-                          final picked = await showDatePicker(
-                            context: ctx,
-                            initialDate:
-                                dday ??
-                                DateTime.now().add(const Duration(days: 30)),
-                            firstDate: DateTime.now().subtract(
-                              const Duration(days: 365),
+                const SizedBox(height: 10),
+                // Settings container (compact bordered box)
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest.withValues(
+                      alpha: 0.35,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: theme.dividerTheme.color ?? Colors.transparent,
+                    ),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // D-Day row
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 2),
+                        child: Row(
+                          children: [
+                            Icon(
+                              dday != null
+                                  ? Icons.event_rounded
+                                  : Icons.event_outlined,
+                              size: 17,
+                              color: theme.colorScheme.onSurfaceVariant,
                             ),
-                            lastDate: DateTime.now().add(
-                              const Duration(days: 3650),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: () async {
+                                  final picked = await showDatePicker(
+                                    context: ctx,
+                                    initialDate:
+                                        dday ??
+                                        DateTime.now().add(
+                                          const Duration(days: 30),
+                                        ),
+                                    firstDate: DateTime.now().subtract(
+                                      const Duration(days: 365),
+                                    ),
+                                    lastDate: DateTime.now().add(
+                                      const Duration(days: 3650),
+                                    ),
+                                  );
+                                  if (picked != null) {
+                                    setSheetState(() => dday = picked);
+                                  }
+                                },
+                                child: Text(
+                                  dday != null
+                                      ? 'D-Day: ${MarkdoneDateFormatter.formatDate(dday!)}'
+                                      : 'Set D-Day',
+                                  style: theme.textTheme.labelLarge?.copyWith(
+                                    fontSize: 13,
+                                    color: dday != null
+                                        ? theme.colorScheme.onSurface
+                                        : theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ),
                             ),
-                          );
-                          if (picked != null) {
-                            setSheetState(() => dday = picked);
-                          }
-                        },
-                        icon: const Icon(Icons.event_rounded),
-                        label: Text(
-                          dday != null
-                              ? 'D-Day: ${dday!.day}/${dday!.month}/${dday!.year}'
-                              : 'Set D-Day',
+                            SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: Checkbox(
+                                value: dday != null,
+                                onChanged: (checked) async {
+                                  if (checked == true) {
+                                    final picked = await showDatePicker(
+                                      context: ctx,
+                                      initialDate: DateTime.now().add(
+                                        const Duration(days: 30),
+                                      ),
+                                      firstDate: DateTime.now().subtract(
+                                        const Duration(days: 365),
+                                      ),
+                                      lastDate: DateTime.now().add(
+                                        const Duration(days: 3650),
+                                      ),
+                                    );
+                                    if (picked != null) {
+                                      setSheetState(() => dday = picked);
+                                    }
+                                  } else {
+                                    setSheetState(() => dday = null);
+                                  }
+                                },
+                                materialTapTargetSize:
+                                    MaterialTapTargetSize.shrinkWrap,
+                                visualDensity: VisualDensity.compact,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ),
-                    if (dday != null) ...[
-                      const SizedBox(width: 8),
-                      IconButton(
-                        icon: Icon(
-                          Icons.clear_rounded,
-                          color: theme.colorScheme.error,
+                      if (calSyncEnabled) ...[
+                        Divider(
+                          height: 12,
+                          thickness: 1,
+                          color: theme.dividerTheme.color ?? Colors.transparent,
                         ),
-                        onPressed: () => setSheetState(() => dday = null),
+                        // Calendar sync row
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 2),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.calendar_month_outlined,
+                                size: 17,
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Sync with calendar',
+                                style: theme.textTheme.labelLarge?.copyWith(
+                                  fontSize: 13,
+                                  color: syncWithCalendar
+                                      ? theme.colorScheme.onSurface
+                                      : theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                              const Spacer(),
+                              SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: Checkbox(
+                                  value: syncWithCalendar,
+                                  onChanged: (v) => setSheetState(
+                                    () => syncWithCalendar = v ?? false,
+                                  ),
+                                  materialTapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                      Divider(
+                        height: 12,
+                        thickness: 1,
+                        color: theme.dividerTheme.color ?? Colors.transparent,
+                      ),
+                      // Background color row
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 2),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.palette_outlined,
+                              size: 17,
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: () async {
+                                  final picked = await showBgColorPicker(
+                                    ctx,
+                                    bgColor,
+                                  );
+                                  if (picked != null) {
+                                    setSheetState(() => bgColor = picked);
+                                  }
+                                },
+                                child: Text(
+                                  bgColor != null
+                                      ? 'Background color'
+                                      : 'Set background color',
+                                  style: theme.textTheme.labelLarge?.copyWith(
+                                    fontSize: 13,
+                                    color: bgColor != null
+                                        ? theme.colorScheme.onSurface
+                                        : theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            if (bgColor != null) ...[
+                              GestureDetector(
+                                onTap: () async {
+                                  final picked = await showBgColorPicker(
+                                    ctx,
+                                    bgColor,
+                                  );
+                                  if (picked != null) {
+                                    setSheetState(() => bgColor = picked);
+                                  }
+                                },
+                                child: Container(
+                                  width: 22,
+                                  height: 22,
+                                  decoration: BoxDecoration(
+                                    color: bgColor,
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(
+                                      color: theme.colorScheme.onSurfaceVariant
+                                          .withValues(alpha: 0.3),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                            ],
+                            SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: Checkbox(
+                                value: bgColor != null,
+                                onChanged: (checked) async {
+                                  if (checked == true) {
+                                    final picked = await showBgColorPicker(
+                                      ctx,
+                                      null,
+                                    );
+                                    if (picked != null) {
+                                      setSheetState(() => bgColor = picked);
+                                    }
+                                  } else {
+                                    setSheetState(() => bgColor = null);
+                                  }
+                                },
+                                materialTapTargetSize:
+                                    MaterialTapTargetSize.shrinkWrap,
+                                visualDensity: VisualDensity.compact,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
-                  ],
-                ),
-                if (calSyncEnabled) ...[
-                  const SizedBox(height: 8),
-                  CheckboxListTile(
-                    value: syncWithCalendar,
-                    onChanged: (v) =>
-                        setSheetState(() => syncWithCalendar = v ?? false),
-                    title: const Text('Sync with Calendar'),
-                    subtitle: const Text(
-                      'Task reminders will be added to your device calendar',
-                    ),
-                    secondary: const Icon(Icons.calendar_month_outlined),
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                    controlAffinity: ListTileControlAffinity.leading,
                   ),
-                ],
-                const SizedBox(height: 20),
+                ),
+                const SizedBox(height: 14),
                 FilledButton(
                   onPressed: () {
                     final title = titleController.text.trim();
@@ -870,6 +1097,10 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                       dday: dday,
                       clearDday: dday == null,
                       syncWithCalendar: syncWithCalendar,
+                      bgColor: bgColor != null
+                          ? colorToHexString(bgColor!)
+                          : null,
+                      clearBgColor: bgColor == null,
                     );
 
                     ref
@@ -957,21 +1188,41 @@ class _ProgressSummary extends StatelessWidget {
   final int total;
   final int completed;
   final double progress;
+  final Color? bgTint;
 
   const _ProgressSummary({
     required this.total,
     required this.completed,
     required this.progress,
+    this.bgTint,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
+    // Tint the card background to match the project bg color
+    final containerBg = bgTint != null
+        ? Color.lerp(
+            theme.cardColor,
+            bgTint!.withValues(alpha: 1.0),
+            (bgTint!.a * 1.2).clamp(0.0, 1.0),
+          )!
+        : theme.cardColor;
+
+    // Use the tint color for the progress indicator if available
+    final accentColor = bgTint != null
+        ? Color.lerp(
+            theme.colorScheme.primary,
+            bgTint!.withValues(alpha: 1.0),
+            0.5,
+          )!
+        : theme.colorScheme.primary;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: theme.cardColor,
+        color: containerBg,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: theme.dividerTheme.color ?? Colors.transparent,
@@ -988,17 +1239,15 @@ class _ProgressSummary extends StatelessWidget {
                 CircularProgressIndicator(
                   value: progress,
                   strokeWidth: 4,
-                  backgroundColor: theme.colorScheme.primary.withValues(
-                    alpha: 0.12,
-                  ),
-                  valueColor: AlwaysStoppedAnimation(theme.colorScheme.primary),
+                  backgroundColor: accentColor.withValues(alpha: 0.15),
+                  valueColor: AlwaysStoppedAnimation(accentColor),
                 ),
                 Text(
                   '${(progress * 100).toStringAsFixed(0)}%',
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
-                    color: theme.colorScheme.primary,
+                    color: accentColor,
                   ),
                 ),
               ],
@@ -1035,11 +1284,13 @@ class _DdayChip extends StatelessWidget {
   Widget build(BuildContext context) {
     Color color;
     if (daysUntil < 0) {
-      color = Colors.red;
-    } else if (daysUntil <= 7) {
-      color = Colors.orange;
+      color = AppColors.ddayUrgent;
+    } else if (daysUntil <= 3) {
+      color = AppColors.ddayUrgent;
+    } else if (daysUntil <= 14) {
+      color = AppColors.ddaySoon;
     } else {
-      color = Colors.green;
+      color = AppColors.ddayRelaxed;
     }
 
     String label;
@@ -1068,157 +1319,386 @@ class _DdayChip extends StatelessWidget {
   }
 }
 
-class _ScheduleOptionCard extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final bool enabled;
-  final ValueChanged<bool> onToggle;
-  final Widget child;
+/// A single compact container with Reminder + Repeat as two inline rows.
+class _CompactScheduleSection extends StatelessWidget {
+  final ThemeData theme;
+  final bool reminderEnabled;
+  final ValueChanged<bool> onReminderToggle;
+  final TextEditingController reminderValueController;
+  final VoidCallback onReminderValueChanged;
+  final ReminderUnit reminderUnit;
+  final ValueChanged<ReminderUnit> onReminderUnitChanged;
+  final String? reminderError;
+  final bool recurrenceEnabled;
+  final ValueChanged<bool> onRecurrenceToggle;
+  final TextEditingController recurrenceIntervalController;
+  final VoidCallback onRecurrenceValueChanged;
+  final RecurrenceFrequency recurrenceFrequency;
+  final ValueChanged<RecurrenceFrequency> onRecurrenceFreqChanged;
+  final String? recurrenceError;
+  final String? scheduleValidation;
+  final bool showCalendarSync;
+  final bool calendarSyncValue;
+  final ValueChanged<bool>? onCalendarSyncChanged;
+  final DateTime? alarm;
+  final VoidCallback? onAlarmRemoved;
+  final VoidCallback? onAlarmDateTap;
 
-  const _ScheduleOptionCard({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.enabled,
-    required this.onToggle,
-    required this.child,
+  const _CompactScheduleSection({
+    required this.theme,
+    required this.reminderEnabled,
+    required this.onReminderToggle,
+    required this.reminderValueController,
+    required this.onReminderValueChanged,
+    required this.reminderUnit,
+    required this.onReminderUnitChanged,
+    required this.reminderError,
+    required this.recurrenceEnabled,
+    required this.onRecurrenceToggle,
+    required this.recurrenceIntervalController,
+    required this.onRecurrenceValueChanged,
+    required this.recurrenceFrequency,
+    required this.onRecurrenceFreqChanged,
+    required this.recurrenceError,
+    required this.scheduleValidation,
+    this.showCalendarSync = false,
+    this.calendarSyncValue = false,
+    this.onCalendarSyncChanged,
+    this.alarm,
+    this.onAlarmRemoved,
+    this.onAlarmDateTap,
   });
+
+  static String _capitalize(String value) {
+    if (value.isEmpty) return value;
+    return '${value[0].toUpperCase()}${value.substring(1)}';
+  }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 180),
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+    return Container(
+      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: enabled
-            ? theme.colorScheme.primaryContainer.withValues(alpha: 0.28)
-            : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
-        borderRadius: BorderRadius.circular(16),
+        color: theme.colorScheme.surfaceContainerHighest.withValues(
+          alpha: 0.35,
+        ),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: enabled
-              ? theme.colorScheme.primary.withValues(alpha: 0.35)
-              : theme.colorScheme.outlineVariant.withValues(alpha: 0.55),
+          color: theme.dividerTheme.color ?? Colors.transparent,
         ),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Row(
-            children: [
-              Icon(icon, size: 18, color: theme.colorScheme.primary),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(title, style: theme.textTheme.titleSmall),
-                    Text(
-                      subtitle,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
+          // Alarm row — always visible
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            child: Row(
+              children: [
+                Icon(
+                  alarm != null
+                      ? Icons.alarm_on_rounded
+                      : Icons.alarm_add_rounded,
+                  size: 17,
+                  color: alarm != null
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: onAlarmDateTap,
+                    child: Text(
+                      alarm != null
+                          ? MarkdoneDateFormatter.formatDateTimeShort(alarm!)
+                          : 'Set alarm',
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        fontSize: 13,
+                        color: alarm != null
+                            ? theme.colorScheme.primary
+                            : theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: Checkbox(
+                    value: alarm != null,
+                    onChanged: (checked) {
+                      if (checked == true) {
+                        onAlarmDateTap?.call();
+                      } else {
+                        onAlarmRemoved?.call();
+                      }
+                    },
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Divider(
+            height: 12,
+            thickness: 1,
+            color: theme.dividerTheme.color ?? Colors.transparent,
+          ),
+          // Reminder row
+          IgnorePointer(
+            ignoring: alarm == null,
+            child: AnimatedOpacity(
+              opacity: alarm != null ? 1.0 : 0.35,
+              duration: const Duration(milliseconds: 150),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _ScheduleRow(
+                    theme: theme,
+                    icon: Icons.notifications_active_outlined,
+                    label: 'Remind',
+                    enabled: reminderEnabled,
+                    onToggle: onReminderToggle,
+                    valueController: reminderValueController,
+                    onValueChanged: onReminderValueChanged,
+                    errorText: reminderError,
+                    selectedUnit: reminderUnit,
+                    units: ReminderUnit.values,
+                    unitLabelBuilder: (u) => _capitalize(u.pluralUnit),
+                    onUnitChanged: onReminderUnitChanged,
+                    hintText: 'min',
+                  ),
+                  Divider(
+                    height: 12,
+                    thickness: 1,
+                    color: theme.dividerTheme.color ?? Colors.transparent,
+                  ),
+                  // Recurrence row
+                  _ScheduleRow(
+                    theme: theme,
+                    icon: Icons.repeat_rounded,
+                    label: 'Repeat',
+                    enabled: recurrenceEnabled,
+                    onToggle: onRecurrenceToggle,
+                    valueController: recurrenceIntervalController,
+                    onValueChanged: onRecurrenceValueChanged,
+                    errorText: recurrenceError,
+                    selectedUnit: recurrenceFrequency,
+                    units: RecurrenceFrequency.values,
+                    unitLabelBuilder: (f) => _capitalize(f.pluralUnit),
+                    onUnitChanged: onRecurrenceFreqChanged,
+                    hintText: '#',
+                  ),
+                  if (showCalendarSync) ...[
+                    Divider(
+                      height: 12,
+                      thickness: 1,
+                      color: theme.dividerTheme.color ?? Colors.transparent,
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 2),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.event_outlined,
+                            size: 17,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Add to calendar',
+                            style: theme.textTheme.labelLarge?.copyWith(
+                              fontSize: 13,
+                              color: calendarSyncValue
+                                  ? theme.colorScheme.onSurface
+                                  : theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                          const Spacer(),
+                          SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: Checkbox(
+                              value: calendarSyncValue,
+                              onChanged: (value) =>
+                                  onCalendarSyncChanged?.call(value ?? false),
+                              materialTapTargetSize:
+                                  MaterialTapTargetSize.shrinkWrap,
+                              visualDensity: VisualDensity.compact,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
-                ),
+                ],
               ),
-              Switch(value: enabled, onChanged: onToggle),
-            ],
+            ),
           ),
-          const SizedBox(height: 12),
-          child,
+          if (scheduleValidation != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              scheduleValidation!,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.error,
+                fontSize: 11,
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
 }
 
-class _IntervalEditor<T> extends StatelessWidget {
+/// A single row: [icon] [label] [number field] [unit dropdown] [checkbox]
+class _ScheduleRow<T> extends StatelessWidget {
+  final ThemeData theme;
+  final IconData icon;
+  final String label;
   final bool enabled;
+  final ValueChanged<bool> onToggle;
   final TextEditingController valueController;
   final VoidCallback onValueChanged;
-  final String valueLabel;
-  final String? valueErrorText;
+  final String? errorText;
   final T selectedUnit;
   final List<T> units;
-  final ValueChanged<T> onChanged;
-  final String Function(T unit) itemLabelBuilder;
-  final IconData icon;
+  final String Function(T) unitLabelBuilder;
+  final ValueChanged<T> onUnitChanged;
+  final String hintText;
 
-  const _IntervalEditor({
+  const _ScheduleRow({
+    required this.theme,
+    required this.icon,
+    required this.label,
     required this.enabled,
+    required this.onToggle,
     required this.valueController,
     required this.onValueChanged,
-    required this.valueLabel,
-    required this.valueErrorText,
+    required this.errorText,
     required this.selectedUnit,
     required this.units,
-    required this.onChanged,
-    required this.itemLabelBuilder,
-    required this.icon,
+    required this.unitLabelBuilder,
+    required this.onUnitChanged,
+    required this.hintText,
   });
 
   @override
   Widget build(BuildContext context) {
     return AnimatedOpacity(
-      opacity: enabled ? 1 : 0.56,
-      duration: const Duration(milliseconds: 180),
-      child: IgnorePointer(
-        ignoring: !enabled,
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final stackFields = constraints.maxWidth < 260;
-
-            final valueField = TextField(
-              controller: valueController,
-              keyboardType: TextInputType.number,
-              onChanged: (_) => onValueChanged(),
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              decoration: InputDecoration(
-                labelText: valueLabel,
-                prefixIcon: Icon(icon),
-                errorText: valueErrorText,
-              ),
-            );
-
-            final unitField = DropdownButtonFormField<T>(
-              key: ValueKey<Object?>('${selectedUnit}_$enabled'),
-              initialValue: selectedUnit,
-              decoration: const InputDecoration(labelText: 'Unit'),
-              items: units
-                  .map(
-                    (unit) => DropdownMenuItem<T>(
-                      value: unit,
-                      child: Text(itemLabelBuilder(unit)),
+      opacity: enabled ? 1.0 : 0.5,
+      duration: const Duration(milliseconds: 150),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Row(
+          children: [
+            // Icon + label
+            Icon(icon, size: 17, color: theme.colorScheme.primary),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: theme.textTheme.labelLarge?.copyWith(fontSize: 13),
+            ),
+            const SizedBox(width: 10),
+            // Value input (compact)
+            SizedBox(
+              width: 48,
+              height: 34,
+              child: IgnorePointer(
+                ignoring: !enabled,
+                child: TextField(
+                  controller: valueController,
+                  keyboardType: TextInputType.number,
+                  onChanged: (_) => onValueChanged(),
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontSize: 13,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: hintText,
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 4,
+                      vertical: 8,
                     ),
-                  )
-                  .toList(),
-              onChanged: enabled
-                  ? (value) {
-                      if (value != null) {
-                        onChanged(value);
-                      }
-                    }
-                  : null,
-            );
-
-            if (stackFields) {
-              return Column(
-                children: [valueField, const SizedBox(height: 10), unitField],
-              );
-            }
-
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(child: valueField),
-                const SizedBox(width: 10),
-                Expanded(child: unitField),
-              ],
-            );
-          },
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide.none,
+                    ),
+                    filled: true,
+                    fillColor: theme.colorScheme.surfaceContainerHighest
+                        .withValues(alpha: 0.6),
+                    errorText: null,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 6),
+            // Unit dropdown (compact)
+            Expanded(
+              child: SizedBox(
+                height: 34,
+                child: IgnorePointer(
+                  ignoring: !enabled,
+                  child: DropdownButtonFormField<T>(
+                    key: ValueKey<Object?>('${selectedUnit}_$enabled'),
+                    initialValue: selectedUnit,
+                    isDense: true,
+                    isExpanded: true,
+                    decoration: InputDecoration(
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 8,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide.none,
+                      ),
+                      filled: true,
+                      fillColor: theme.colorScheme.surfaceContainerHighest
+                          .withValues(alpha: 0.6),
+                    ),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontSize: 13,
+                      color: theme.colorScheme.onSurface,
+                    ),
+                    items: units
+                        .map(
+                          (unit) => DropdownMenuItem<T>(
+                            value: unit,
+                            child: Text(
+                              unitLabelBuilder(unit),
+                              style: const TextStyle(fontSize: 13),
+                            ),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: enabled
+                        ? (value) {
+                            if (value != null) onUnitChanged(value);
+                          }
+                        : null,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 6),
+            // Checkbox on far right
+            SizedBox(
+              width: 22,
+              height: 22,
+              child: Checkbox(
+                value: enabled,
+                onChanged: (v) => onToggle(v ?? false),
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+          ],
         ),
       ),
     );

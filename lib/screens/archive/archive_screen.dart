@@ -113,7 +113,7 @@ class ArchiveScreen extends ConsumerWidget {
                     padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
                     child: Align(
                       alignment: Alignment.centerRight,
-                      child: FilledButton.tonalIcon(
+                      child: OutlinedButton.icon(
                         onPressed: () => _restoreProject(
                           context,
                           ref,

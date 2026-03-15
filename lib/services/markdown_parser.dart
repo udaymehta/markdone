@@ -47,6 +47,7 @@ class MarkdownParser {
         _parseDate(frontmatter['created']?.toString()) ?? DateTime.now();
     final dday = _parseDate(frontmatter['dday']?.toString());
     final color = frontmatter['color']?.toString();
+    final bgColor = frontmatter['bg_color']?.toString();
     final description = frontmatter['description']?.toString();
     final syncWithCalendar = frontmatter['sync_calendar'] == true;
 
@@ -69,6 +70,7 @@ class MarkdownParser {
         String? calendarEventId;
         Duration? reminderBefore;
         RecurrenceRule? recurrence;
+        int? sortOrder;
 
         final metaMatch = _metadataCommentRegex.firstMatch(rawTitle);
         if (metaMatch != null) {
@@ -98,6 +100,9 @@ class MarkdownParser {
               metaJson['recurrence'],
               fallbackAlarm: alarm,
             );
+            if (metaJson['sortOrder'] is int) {
+              sortOrder = metaJson['sortOrder'] as int;
+            }
           } catch (_) {
             // Ignore malformed metadata
           }
@@ -121,6 +126,7 @@ class MarkdownParser {
             reminderBefore: reminderBefore,
             recurrence: recurrence,
             lineIndex: i,
+            sortOrder: sortOrder,
           ).normalizedSchedule(),
         );
       }
@@ -132,6 +138,7 @@ class MarkdownParser {
       created: created,
       dday: dday,
       color: color,
+      bgColor: bgColor,
       description: description,
       syncWithCalendar: syncWithCalendar,
       todos: todos,
@@ -147,7 +154,9 @@ class MarkdownParser {
     buffer.writeln('---');
     final fm = project.toFrontmatterMap();
     for (final entry in fm.entries) {
-      if (entry.value is String && entry.value.toString().contains(':')) {
+      if (entry.value is String &&
+          (entry.value.toString().contains(':') ||
+              entry.value.toString().contains('#'))) {
         buffer.writeln('${entry.key}: "${entry.value}"');
       } else {
         buffer.writeln('${entry.key}: ${entry.value}');

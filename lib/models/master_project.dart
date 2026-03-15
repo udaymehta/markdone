@@ -19,6 +19,7 @@ class MasterProject {
   final DateTime created;
   final DateTime? dday; // D-Day target date
   final String? color; // Hex color override for this project
+  final String? bgColor; // Hex+alpha background tint for project page
   final String? description; // Optional description from frontmatter
   final List<SubTodo> todos;
   final String bodyMarkdown; // Raw body (non-frontmatter) content
@@ -30,6 +31,7 @@ class MasterProject {
     required this.created,
     this.dday,
     this.color,
+    this.bgColor,
     this.description,
     this.todos = const [],
     this.bodyMarkdown = '',
@@ -42,12 +44,14 @@ class MasterProject {
     DateTime? created,
     DateTime? dday,
     String? color,
+    String? bgColor,
     String? description,
     List<SubTodo>? todos,
     String? bodyMarkdown,
     bool? syncWithCalendar,
     bool clearDday = false,
     bool clearColor = false,
+    bool clearBgColor = false,
     bool clearDescription = false,
   }) {
     return MasterProject(
@@ -56,6 +60,7 @@ class MasterProject {
       created: created ?? this.created,
       dday: clearDday ? null : (dday ?? this.dday),
       color: clearColor ? null : (color ?? this.color),
+      bgColor: clearBgColor ? null : (bgColor ?? this.bgColor),
       description: clearDescription ? null : (description ?? this.description),
       todos: todos ?? this.todos,
       bodyMarkdown: bodyMarkdown ?? this.bodyMarkdown,
@@ -108,6 +113,7 @@ class MasterProject {
       map['dday'] = dday!.toIso8601String().split('T').first;
     }
     if (color != null) map['color'] = color;
+    if (bgColor != null) map['bg_color'] = bgColor;
     if (description != null) map['description'] = description;
     if (syncWithCalendar) map['sync_calendar'] = true;
     return map;
@@ -123,6 +129,7 @@ class MasterProject {
           created == other.created &&
           dday == other.dday &&
           color == other.color &&
+          bgColor == other.bgColor &&
           description == other.description &&
           syncWithCalendar == other.syncWithCalendar &&
           listEquals(todos, other.todos);
@@ -134,6 +141,7 @@ class MasterProject {
     created,
     dday,
     color,
+    bgColor,
     description,
     syncWithCalendar,
     Object.hashAll(todos),

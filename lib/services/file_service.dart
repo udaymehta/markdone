@@ -166,6 +166,7 @@ class FileService {
     DateTime? dday,
     String? color,
     String? description,
+    String? bgColor,
     bool syncWithCalendar = false,
   }) async {
     final base = await basePath;
@@ -189,6 +190,7 @@ class FileService {
       created: DateTime.now(),
       dday: dday,
       color: color,
+      bgColor: bgColor,
       description: description,
       syncWithCalendar: syncWithCalendar,
       todos: [],

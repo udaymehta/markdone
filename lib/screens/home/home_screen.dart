@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/color_utils.dart';
+import '../../core/date_formatters.dart';
 import '../../core/widgets/centered_popup.dart';
 import '../../models/master_project.dart';
 import '../../providers/project_providers.dart';
@@ -8,7 +10,6 @@ import '../archive/archive_screen.dart';
 import '../project_detail/project_detail_screen.dart';
 import '../dday/dday_screen.dart';
 import '../settings/settings_screen.dart';
-import 'widgets/dday_carousel.dart';
 import 'widgets/project_card.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -141,43 +142,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ref.read(projectsProvider.notifier).syncEverything(),
             child: CustomScrollView(
               slivers: [
-                // D-Day carousel at the top
-                if (ddayProjects.isNotEmpty)
-                  const SliverToBoxAdapter(
-                    child: Padding(
-                      padding: EdgeInsets.only(top: 8, bottom: 16),
-                      child: DdayCarousel(),
-                    ),
-                  ),
-
                 // Section header
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 8,
-                    ),
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
                     child: Row(
                       children: [
-                        Text('Projects', style: theme.textTheme.headlineSmall),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 2,
+                        Text(
+                          'Projects',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                            fontWeight: FontWeight.w500,
                           ),
-                          decoration: BoxDecoration(
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          '${projects.length}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
                             color: theme.colorScheme.primary.withValues(
-                              alpha: 0.12,
-                            ),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Text(
-                            '${projects.length}',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: theme.colorScheme.primary,
+                              alpha: 0.7,
                             ),
                           ),
                         ),
@@ -206,7 +191,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   }, childCount: projects.length),
                 ),
 
-                const SliverToBoxAdapter(child: SizedBox(height: 100)),
+                const SliverToBoxAdapter(child: SizedBox(height: 80)),
               ],
             ),
           );
@@ -214,7 +199,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showCreateDialog(context),
-        child: const Icon(Icons.add_rounded),
+        child: const Icon(Icons.add_rounded, size: 28),
       ),
     );
   }
@@ -224,6 +209,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final descController = TextEditingController();
     DateTime? dday;
     bool syncWithCalendar = false;
+    Color? bgColor;
 
     // Check if calendar sync is globally enabled
     final calSyncEnabled = ref.read(calendarSyncEnabledProvider);
@@ -239,63 +225,272 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text('New Project', style: theme.textTheme.headlineSmall),
-                const SizedBox(height: 20),
+                const SizedBox(height: 14),
+                // Title field
                 TextField(
                   controller: titleController,
                   autofocus: true,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     hintText: 'Project name',
-                    prefixIcon: Icon(Icons.folder_outlined),
+                    prefixIcon: const Icon(Icons.folder_outlined),
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 12,
+                    ),
                   ),
                   textCapitalization: TextCapitalization.sentences,
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 10),
+                // Description field (compact)
                 TextField(
                   controller: descController,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     hintText: 'Description (optional)',
-                    prefixIcon: Icon(Icons.notes_rounded),
+                    prefixIcon: const Icon(Icons.notes_rounded),
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
                   ),
                   textCapitalization: TextCapitalization.sentences,
                   maxLines: 2,
+                  minLines: 1,
                 ),
-                const SizedBox(height: 12),
-                OutlinedButton.icon(
-                  onPressed: () async {
-                    final picked = await showDatePicker(
-                      context: ctx,
-                      initialDate: DateTime.now().add(const Duration(days: 30)),
-                      firstDate: DateTime.now(),
-                      lastDate: DateTime.now().add(const Duration(days: 3650)),
-                    );
-                    if (picked != null) {
-                      setSheetState(() => dday = picked);
-                    }
-                  },
-                  icon: const Icon(Icons.event_rounded),
-                  label: Text(
-                    dday != null
-                        ? 'D-Day: ${dday!.day}/${dday!.month}/${dday!.year}'
-                        : 'Set D-Day (optional)',
-                  ),
-                ),
-                if (calSyncEnabled) ...[
-                  const SizedBox(height: 8),
-                  CheckboxListTile(
-                    value: syncWithCalendar,
-                    onChanged: (v) =>
-                        setSheetState(() => syncWithCalendar = v ?? false),
-                    title: const Text('Sync with Calendar'),
-                    subtitle: const Text(
-                      'Task reminders will be added to your device calendar',
+                const SizedBox(height: 10),
+                // Settings container (compact bordered box)
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest.withValues(
+                      alpha: 0.35,
                     ),
-                    secondary: const Icon(Icons.calendar_month_outlined),
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                    controlAffinity: ListTileControlAffinity.leading,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: theme.dividerTheme.color ?? Colors.transparent,
+                    ),
                   ),
-                ],
-                const SizedBox(height: 20),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // D-Day row
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 2),
+                        child: Row(
+                          children: [
+                            Icon(
+                              dday != null
+                                  ? Icons.event_rounded
+                                  : Icons.event_outlined,
+                              size: 17,
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: () async {
+                                  final picked = await showDatePicker(
+                                    context: ctx,
+                                    initialDate:
+                                        dday ??
+                                        DateTime.now().add(
+                                          const Duration(days: 30),
+                                        ),
+                                    firstDate: DateTime.now(),
+                                    lastDate: DateTime.now().add(
+                                      const Duration(days: 3650),
+                                    ),
+                                  );
+                                  if (picked != null) {
+                                    setSheetState(() => dday = picked);
+                                  }
+                                },
+                                child: Text(
+                                  dday != null
+                                      ? 'D-Day: ${MarkdoneDateFormatter.formatDate(dday!)}'
+                                      : 'Set D-Day',
+                                  style: theme.textTheme.labelLarge?.copyWith(
+                                    fontSize: 13,
+                                    color: dday != null
+                                        ? theme.colorScheme.onSurface
+                                        : theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: Checkbox(
+                                value: dday != null,
+                                onChanged: (checked) async {
+                                  if (checked == true) {
+                                    final picked = await showDatePicker(
+                                      context: ctx,
+                                      initialDate: DateTime.now().add(
+                                        const Duration(days: 30),
+                                      ),
+                                      firstDate: DateTime.now(),
+                                      lastDate: DateTime.now().add(
+                                        const Duration(days: 3650),
+                                      ),
+                                    );
+                                    if (picked != null) {
+                                      setSheetState(() => dday = picked);
+                                    }
+                                  } else {
+                                    setSheetState(() => dday = null);
+                                  }
+                                },
+                                materialTapTargetSize:
+                                    MaterialTapTargetSize.shrinkWrap,
+                                visualDensity: VisualDensity.compact,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (calSyncEnabled) ...[
+                        Divider(
+                          height: 12,
+                          thickness: 1,
+                          color: theme.dividerTheme.color ?? Colors.transparent,
+                        ),
+                        // Calendar sync row
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 2),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.calendar_month_outlined,
+                                size: 17,
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Sync with calendar',
+                                style: theme.textTheme.labelLarge?.copyWith(
+                                  fontSize: 13,
+                                  color: syncWithCalendar
+                                      ? theme.colorScheme.onSurface
+                                      : theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                              const Spacer(),
+                              SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: Checkbox(
+                                  value: syncWithCalendar,
+                                  onChanged: (v) => setSheetState(
+                                    () => syncWithCalendar = v ?? false,
+                                  ),
+                                  materialTapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                      Divider(
+                        height: 12,
+                        thickness: 1,
+                        color: theme.dividerTheme.color ?? Colors.transparent,
+                      ),
+                      // Background color row
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 2),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.palette_outlined,
+                              size: 17,
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: () async {
+                                  final picked = await showBgColorPicker(
+                                    ctx,
+                                    bgColor,
+                                  );
+                                  if (picked != null) {
+                                    setSheetState(() => bgColor = picked);
+                                  }
+                                },
+                                child: Text(
+                                  bgColor != null
+                                      ? 'Background color'
+                                      : 'Set background color',
+                                  style: theme.textTheme.labelLarge?.copyWith(
+                                    fontSize: 13,
+                                    color: bgColor != null
+                                        ? theme.colorScheme.onSurface
+                                        : theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            if (bgColor != null) ...[
+                              GestureDetector(
+                                onTap: () async {
+                                  final picked = await showBgColorPicker(
+                                    ctx,
+                                    bgColor,
+                                  );
+                                  if (picked != null) {
+                                    setSheetState(() => bgColor = picked);
+                                  }
+                                },
+                                child: Container(
+                                  width: 22,
+                                  height: 22,
+                                  decoration: BoxDecoration(
+                                    color: bgColor,
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(
+                                      color: theme.colorScheme.onSurfaceVariant
+                                          .withValues(alpha: 0.3),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                            ],
+                            SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: Checkbox(
+                                value: bgColor != null,
+                                onChanged: (checked) async {
+                                  if (checked == true) {
+                                    final picked = await showBgColorPicker(
+                                      ctx,
+                                      null,
+                                    );
+                                    if (picked != null) {
+                                      setSheetState(() => bgColor = picked);
+                                    }
+                                  } else {
+                                    setSheetState(() => bgColor = null);
+                                  }
+                                },
+                                materialTapTargetSize:
+                                    MaterialTapTargetSize.shrinkWrap,
+                                visualDensity: VisualDensity.compact,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
                 FilledButton(
                   onPressed: () {
                     final title = titleController.text.trim();
@@ -307,6 +502,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           dday: dday,
                           description: descController.text.trim().isNotEmpty
                               ? descController.text.trim()
+                              : null,
+                          bgColor: bgColor != null
+                              ? colorToHexString(bgColor!)
                               : null,
                           syncWithCalendar: syncWithCalendar,
                         );
