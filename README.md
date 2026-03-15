@@ -1,5 +1,5 @@
 <p align="center">
-	<img src="assets/icon.png" alt="MarkDone app icon" width="72" height="72" />
+	<img src="assets/icon.png" alt="MarkDone app icon" width="90" height="90" />
 </p>
 
 <h1 align="center">MarkDone!</h1>
