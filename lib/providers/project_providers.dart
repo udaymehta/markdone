@@ -387,6 +387,7 @@ class ProjectsNotifier extends AsyncNotifier<List<MasterProject>> {
     DateTime? dday,
     String? color,
     String? description,
+    String? bgColor,
     bool syncWithCalendar = false,
   }) async {
     final fileService = ref.read(fileServiceProvider);
@@ -395,6 +396,7 @@ class ProjectsNotifier extends AsyncNotifier<List<MasterProject>> {
       dday: dday,
       color: color,
       description: description,
+      bgColor: bgColor,
       syncWithCalendar: syncWithCalendar,
     );
     await reload();
@@ -517,6 +519,46 @@ class ProjectsNotifier extends AsyncNotifier<List<MasterProject>> {
     await _removeTodoFromCalendar(todo);
 
     final updatedTodos = project.todos.where((t) => t.id != todoId).toList();
+    final updatedProject = await _persistProjectUpdate(
+      project: project,
+      todos: updatedTodos,
+    );
+
+    final updatedProjects = List<MasterProject>.from(current);
+    updatedProjects[projectIdx] = updatedProject;
+    state = AsyncData(updatedProjects);
+  }
+
+  /// Reorders a pending sub-todo within a project (drag-to-reorder).
+  /// [oldIndex] and [newIndex] are indices within the pending (non-completed)
+  /// todo list. Persists the new order via sortOrder metadata.
+  Future<void> reorderTodo(String filePath, int oldIndex, int newIndex) async {
+    final current = state.value ?? [];
+    final projectIdx = current.indexWhere((p) => p.filePath == filePath);
+    if (projectIdx < 0) return;
+
+    final project = current[projectIdx];
+
+    // Split into pending and completed, preserving their relative order
+    final pending = project.todos.where((t) => !t.isCompleted).toList();
+    final completed = project.todos.where((t) => t.isCompleted).toList();
+
+    if (oldIndex < 0 || oldIndex >= pending.length) return;
+    if (newIndex < 0 || newIndex > pending.length) return;
+
+    // Flutter's ReorderableList uses newIndex after removal semantics
+    final adjusted = newIndex > oldIndex ? newIndex - 1 : newIndex;
+
+    final item = pending.removeAt(oldIndex);
+    pending.insert(adjusted, item);
+
+    // Stamp sortOrder so custom order survives a reload
+    final reorderedPending = <SubTodo>[];
+    for (var i = 0; i < pending.length; i++) {
+      reorderedPending.add(pending[i].copyWith(sortOrder: i));
+    }
+
+    final updatedTodos = [...reorderedPending, ...completed];
     final updatedProject = await _persistProjectUpdate(
       project: project,
       todos: updatedTodos,

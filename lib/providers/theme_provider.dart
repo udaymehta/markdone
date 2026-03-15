@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/date_formatters.dart';
 import '../core/theme/app_theme.dart';
 import 'settings_providers.dart';
 
@@ -56,4 +57,71 @@ class AccentColorNotifier extends Notifier<Color> {
   }
 
   void reset() => setColor(AppColors.accent);
+}
+
+// --- Font Scale Provider ---
+
+final fontScaleProvider = NotifierProvider<FontScaleNotifier, double>(
+  FontScaleNotifier.new,
+);
+
+class FontScaleNotifier extends Notifier<double> {
+  @override
+  double build() {
+    final settings = ref.read(settingsServiceProvider);
+    return settings.getFontScale();
+  }
+
+  void setScale(double scale) {
+    final settings = ref.read(settingsServiceProvider);
+    settings.setFontScale(scale);
+    state = scale;
+  }
+
+  void reset() => setScale(1.0);
+}
+
+// --- AMOLED Dark Mode Provider ---
+
+final amoledDarkProvider = NotifierProvider<AmoledDarkNotifier, bool>(
+  AmoledDarkNotifier.new,
+);
+
+class AmoledDarkNotifier extends Notifier<bool> {
+  @override
+  bool build() {
+    final settings = ref.read(settingsServiceProvider);
+    return settings.getAmoledDark();
+  }
+
+  void setEnabled(bool value) {
+    final settings = ref.read(settingsServiceProvider);
+    settings.setAmoledDark(value);
+    state = value;
+  }
+
+  void toggle() => setEnabled(!state);
+}
+
+// --- Date Format Style Provider ---
+
+final dateFormatStyleProvider =
+    NotifierProvider<DateFormatStyleNotifier, DateFormatStyle>(
+      DateFormatStyleNotifier.new,
+    );
+
+class DateFormatStyleNotifier extends Notifier<DateFormatStyle> {
+  @override
+  DateFormatStyle build() {
+    final settings = ref.read(settingsServiceProvider);
+    final stored = settings.getDateFormat();
+    return DateFormatStyle.values.asNameMap()[stored] ??
+        DateFormatStyle.mmddyyyy;
+  }
+
+  void setStyle(DateFormatStyle value) {
+    final settings = ref.read(settingsServiceProvider);
+    settings.setDateFormat(value.name);
+    state = value;
+  }
 }

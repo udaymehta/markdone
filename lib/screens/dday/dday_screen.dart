@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
+import '../../core/date_formatters.dart';
 import '../../core/theme/app_theme.dart';
 import '../../providers/project_providers.dart';
 
@@ -109,9 +109,9 @@ class DdayScreen extends ConsumerWidget {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              DateFormat(
-                                'EEEE, MMMM d, y',
-                              ).format(project.dday!),
+                              MarkdoneDateFormatter.formatLongDate(
+                                project.dday!,
+                              ),
                               style: theme.textTheme.bodySmall,
                             ),
                             if (project.todos.isNotEmpty) ...[

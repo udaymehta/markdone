@@ -12,6 +12,9 @@ class SettingsService {
   static const String _keyAccentColor = 'markdone_accent_color';
   static const String _keyHideCompleted = 'markdone_hide_completed';
   static const String _keyCalendarSyncEnabled = 'markdone_calendar_sync';
+  static const String _keyFontScale = 'markdone_font_scale';
+  static const String _keyAmoledDark = 'markdone_amoled_dark';
+  static const String _keyDateFormat = 'markdone_date_format';
 
   final SharedPreferences _prefs;
 
@@ -64,4 +67,22 @@ class SettingsService {
 
   void setCalendarSyncEnabled(bool value) =>
       _prefs.setBool(_keyCalendarSyncEnabled, value);
+
+  // --- Font Scale ---
+
+  double getFontScale() => _prefs.getDouble(_keyFontScale) ?? 1.0;
+
+  void setFontScale(double value) => _prefs.setDouble(_keyFontScale, value);
+
+  // --- AMOLED Dark Mode ---
+
+  bool getAmoledDark() => _prefs.getBool(_keyAmoledDark) ?? false;
+
+  void setAmoledDark(bool value) => _prefs.setBool(_keyAmoledDark, value);
+
+  // --- Date Format ---
+
+  String? getDateFormat() => _prefs.getString(_keyDateFormat);
+
+  void setDateFormat(String value) => _prefs.setString(_keyDateFormat, value);
 }

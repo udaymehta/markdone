@@ -10,11 +10,17 @@ class AppColors {
   static const Color accentLight = Color(0xFFFF9A6C);
   static const Color accentDark = Color(0xFFD94F1E);
 
-  // Dark theme surfaces
-  static const Color darkSurface = Color(0xFF121216);
-  static const Color darkSurfaceVariant = Color(0xFF1C1C22);
-  static const Color darkCard = Color(0xFF1E1E26);
-  static const Color darkCardHover = Color(0xFF26262F);
+  // Dark theme surfaces (softer dark grey)
+  static const Color darkSurface = Color(0xFF1C1C24);
+  static const Color darkSurfaceVariant = Color(0xFF262630);
+  static const Color darkCard = Color(0xFF23232C);
+  static const Color darkCardHover = Color(0xFF2D2D38);
+
+  // AMOLED surfaces (pure black for OLED screens)
+  static const Color amoledSurface = Color(0xFF000000);
+  static const Color amoledSurfaceVariant = Color(0xFF111118);
+  static const Color amoledCard = Color(0xFF0A0A12);
+  static const Color amoledCardHover = Color(0xFF161620);
 
   // Light theme surfaces
   static const Color lightSurface = Color(0xFFFAFAFC);
@@ -41,9 +47,21 @@ class AppColors {
 class AppTheme {
   AppTheme._();
 
-  static ThemeData darkTheme([Color accent = AppColors.accent]) {
+  static ThemeData darkTheme([
+    Color accent = AppColors.accent,
+    bool amoled = false,
+  ]) {
     final accentLight = _shiftLightness(accent, 0.12);
     final accentDark = _shiftLightness(accent, -0.12);
+
+    final surface = amoled ? AppColors.amoledSurface : AppColors.darkSurface;
+    final surfaceVariant = amoled
+        ? AppColors.amoledSurfaceVariant
+        : AppColors.darkSurfaceVariant;
+    final card = amoled ? AppColors.amoledCard : AppColors.darkCard;
+    final borderAlpha = amoled ? 0.10 : 0.06;
+    final outlineAlpha = amoled ? 0.16 : 0.12;
+    final dialogBorderAlpha = amoled ? 0.12 : 0.08;
 
     return ThemeData(
       useMaterial3: true,
@@ -53,27 +71,35 @@ class AppTheme {
         onPrimary: Colors.white,
         primaryContainer: accentDark,
         secondary: accentLight,
-        surface: AppColors.darkSurface,
+        surface: surface,
         onSurface: AppColors.darkText,
         onSurfaceVariant: AppColors.darkTextSecondary,
         error: AppColors.error,
-        outline: Colors.white.withValues(alpha: 0.12),
+        outline: Colors.white.withValues(alpha: outlineAlpha),
       ),
-      scaffoldBackgroundColor: AppColors.darkSurface,
-      cardColor: AppColors.darkCard,
-      appBarTheme: const AppBarTheme(
-        backgroundColor: AppColors.darkSurface,
+      scaffoldBackgroundColor: surface,
+      cardColor: card,
+      appBarTheme: AppBarTheme(
+        backgroundColor: surface,
         foregroundColor: AppColors.darkText,
         elevation: 0,
         centerTitle: false,
         surfaceTintColor: Colors.transparent,
       ),
       cardTheme: CardThemeData(
-        color: AppColors.darkCard,
+        color: card,
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: Colors.white.withValues(alpha: 0.06)),
+          side: BorderSide(color: Colors.white.withValues(alpha: borderAlpha)),
+        ),
+      ),
+      dialogTheme: DialogThemeData(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(28),
+          side: BorderSide(
+            color: Colors.white.withValues(alpha: dialogBorderAlpha),
+          ),
         ),
       ),
       floatingActionButtonTheme: FloatingActionButtonThemeData(
@@ -84,7 +110,7 @@ class AppTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: AppColors.darkSurfaceVariant,
+        fillColor: surfaceVariant,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide.none,
@@ -99,13 +125,13 @@ class AppTheme {
         ),
       ),
       chipTheme: ChipThemeData(
-        backgroundColor: AppColors.darkSurfaceVariant,
+        backgroundColor: surfaceVariant,
         selectedColor: accent.withValues(alpha: 0.2),
         side: BorderSide.none,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
       dividerTheme: DividerThemeData(
-        color: Colors.white.withValues(alpha: 0.06),
+        color: Colors.white.withValues(alpha: borderAlpha),
         thickness: 1,
       ),
       textTheme: _buildTextTheme(
@@ -113,7 +139,7 @@ class AppTheme {
         AppColors.darkTextSecondary,
       ),
       snackBarTheme: SnackBarThemeData(
-        backgroundColor: AppColors.darkCard,
+        backgroundColor: card,
         contentTextStyle: const TextStyle(color: AppColors.darkText),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         behavior: SnackBarBehavior.floating,
@@ -154,6 +180,12 @@ class AppTheme {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
           side: BorderSide(color: Colors.black.withValues(alpha: 0.06)),
+        ),
+      ),
+      dialogTheme: DialogThemeData(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(28),
+          side: BorderSide(color: Colors.black.withValues(alpha: 0.08)),
         ),
       ),
       floatingActionButtonTheme: FloatingActionButtonThemeData(

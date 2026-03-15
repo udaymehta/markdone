@@ -59,10 +59,14 @@ class ReminderConfig {
 
   String get compact => '$value${unit.key}';
 
-  String get label {
-    final unitLabel = value == 1 ? unit.singularUnit : unit.pluralUnit;
-    return '$value $unitLabel';
-  }
+  String get shortUnit => switch (unit) {
+    ReminderUnit.minutes => 'min',
+    ReminderUnit.hours => 'hr',
+    ReminderUnit.days => value == 1 ? 'day' : 'days',
+    ReminderUnit.weeks => value == 1 ? 'wk' : 'wks',
+  };
+
+  String get label => '$value $shortUnit';
 
   static ReminderConfig? fromDuration(Duration? duration) {
     if (duration == null) return null;
@@ -303,6 +307,7 @@ class SubTodo {
   final Duration? reminderBefore;
   final RecurrenceRule? recurrence;
   final int lineIndex;
+  final int? sortOrder;
 
   const SubTodo({
     required this.id,
@@ -314,6 +319,7 @@ class SubTodo {
     this.reminderBefore,
     this.recurrence,
     required this.lineIndex,
+    this.sortOrder,
   });
 
   static String generateId() => _uuid.v4();
@@ -336,10 +342,12 @@ class SubTodo {
     Duration? reminderBefore,
     RecurrenceRule? recurrence,
     int? lineIndex,
+    int? sortOrder,
     bool clearAlarm = false,
     bool clearCalendarEventId = false,
     bool clearReminder = false,
     bool clearRecurrence = false,
+    bool clearSortOrder = false,
   }) {
     return SubTodo(
       id: id ?? this.id,
@@ -355,6 +363,7 @@ class SubTodo {
           : (reminderBefore ?? this.reminderBefore),
       recurrence: clearRecurrence ? null : (recurrence ?? this.recurrence),
       lineIndex: lineIndex ?? this.lineIndex,
+      sortOrder: clearSortOrder ? null : (sortOrder ?? this.sortOrder),
     );
   }
 
@@ -394,6 +403,7 @@ class SubTodo {
     if (calendarEventId != null) map['calendarId'] = calendarEventId;
     if (reminderBefore != null) map['reminder'] = reminderString;
     if (recurrence != null) map['recurrence'] = recurrence!.toJson();
+    if (sortOrder != null) map['sortOrder'] = sortOrder;
     return map;
   }
 
@@ -410,7 +420,8 @@ class SubTodo {
           calendarEventId == other.calendarEventId &&
           reminderBefore == other.reminderBefore &&
           recurrence == other.recurrence &&
-          lineIndex == other.lineIndex;
+          lineIndex == other.lineIndex &&
+          sortOrder == other.sortOrder;
 
   @override
   int get hashCode => Object.hash(
@@ -423,6 +434,7 @@ class SubTodo {
     reminderBefore,
     recurrence,
     lineIndex,
+    sortOrder,
   );
 
   @override

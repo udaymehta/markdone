@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
+import '../../../core/date_formatters.dart';
 import '../../../models/sub_todo.dart';
 import 'animated_checkbox.dart';
 
@@ -9,6 +9,11 @@ class SubTodoTile extends StatelessWidget {
   final VoidCallback onToggle;
   final VoidCallback onTap;
   final VoidCallback? onDismissed;
+  final DateTime? projectDday;
+
+  /// Optional drag handle widget placed at the trailing edge.
+  /// Pass a [ReorderableDragStartListener] wrapping an icon here.
+  final Widget? dragHandle;
 
   const SubTodoTile({
     super.key,
@@ -16,7 +21,48 @@ class SubTodoTile extends StatelessWidget {
     required this.onToggle,
     required this.onTap,
     this.onDismissed,
+    this.projectDday,
+    this.dragHandle,
   });
+
+  Widget _buildMetadata(BuildContext context) {
+    final baseColor = todo.isCompleted
+        ? Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.55)
+        : Theme.of(context).colorScheme.onSurfaceVariant;
+    final baseStyle = Theme.of(
+      context,
+    ).textTheme.bodySmall?.copyWith(color: baseColor, height: 1.35);
+
+    final dateText = MarkdoneDateFormatter.formatDateTime(todo.alarm!);
+    final extras = <String>[];
+    if (todo.reminderBefore != null) {
+      extras.add('${todo.reminderLabel ?? todo.reminderString} before');
+    }
+    if (todo.recurrence != null) {
+      extras.add(todo.recurrence!.label);
+    }
+
+    if (extras.isEmpty) {
+      return Text(
+        dateText,
+        style: baseStyle,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      );
+    }
+
+    return Text.rich(
+      TextSpan(
+        children: [
+          TextSpan(text: dateText),
+          TextSpan(text: '  ·  ${extras.join("  ·  ")}'),
+        ],
+      ),
+      style: baseStyle,
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -24,8 +70,24 @@ class SubTodoTile extends StatelessWidget {
 
     return Dismissible(
       key: ValueKey(todo.id),
-      direction: DismissDirection.endToStart,
+      direction: DismissDirection.horizontal,
+      // Right swipe (start → end): complete/uncomplete
       background: Container(
+        alignment: Alignment.centerLeft,
+        padding: const EdgeInsets.only(left: 20),
+        decoration: BoxDecoration(
+          color: const Color(0xFF34C759).withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Icon(
+          todo.isCompleted
+              ? Icons.undo_rounded
+              : Icons.check_circle_outline_rounded,
+          color: const Color(0xFF34C759),
+        ),
+      ),
+      // Left swipe (end → start): delete
+      secondaryBackground: Container(
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 20),
         decoration: BoxDecoration(
@@ -37,28 +99,33 @@ class SubTodoTile extends StatelessWidget {
           color: theme.colorScheme.error,
         ),
       ),
+      confirmDismiss: (direction) async {
+        if (direction == DismissDirection.startToEnd) {
+          // Right swipe → toggle completion (don't actually dismiss)
+          onToggle();
+          return false;
+        }
+        // Left swipe → confirm delete
+        if (onDismissed == null) return false;
+        return await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Delete Task'),
+            content: Text('Delete "${todo.title}"?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Delete'),
+              ),
+            ],
+          ),
+        );
+      },
       onDismissed: onDismissed != null ? (_) => onDismissed!() : null,
-      confirmDismiss: onDismissed != null
-          ? (_) async {
-              return await showDialog<bool>(
-                context: context,
-                builder: (ctx) => AlertDialog(
-                  title: const Text('Delete Task'),
-                  content: Text('Delete "${todo.title}"?'),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(ctx, false),
-                      child: const Text('Cancel'),
-                    ),
-                    TextButton(
-                      onPressed: () => Navigator.pop(ctx, true),
-                      child: const Text('Delete'),
-                    ),
-                  ],
-                ),
-              );
-            }
-          : null,
       child: GestureDetector(
         onTap: onTap,
         child: Container(
@@ -89,34 +156,8 @@ class SubTodoTile extends StatelessWidget {
                       ),
                     ),
                     if (todo.alarm != null) ...[
-                      const SizedBox(height: 4),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 6,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        children: [
-                          _MetaChip(
-                            icon: Icons.alarm_rounded,
-                            label: DateFormat(
-                              'MMM d, h:mm a',
-                            ).format(todo.alarm!),
-                            color: _alarmColor(context),
-                          ),
-                          if (todo.reminderBefore != null)
-                            _MetaChip(
-                              icon: Icons.notifications_active_outlined,
-                              label:
-                                  '${todo.reminderLabel ?? todo.reminderString} before',
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          if (todo.recurrence != null)
-                            _MetaChip(
-                              icon: Icons.repeat_rounded,
-                              label: todo.recurrence!.label,
-                              color: theme.colorScheme.secondary,
-                            ),
-                        ],
-                      ),
+                      const SizedBox(height: 2),
+                      _buildMetadata(context),
                     ],
                   ],
                 ),
@@ -130,60 +171,10 @@ class SubTodoTile extends StatelessWidget {
                     color: theme.colorScheme.primary.withValues(alpha: 0.6),
                   ),
                 ),
+              ?dragHandle,
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Color _alarmColor(BuildContext context) {
-    if (todo.isCompleted) {
-      return Theme.of(
-        context,
-      ).colorScheme.onSurfaceVariant.withValues(alpha: 0.4);
-    }
-    if (todo.alarm!.isBefore(DateTime.now())) {
-      return Theme.of(context).colorScheme.error;
-    }
-    return Theme.of(context).colorScheme.primary;
-  }
-}
-
-class _MetaChip extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-
-  const _MetaChip({
-    required this.icon,
-    required this.label,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 12, color: color),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: theme.textTheme.bodySmall?.copyWith(
-              fontSize: 11,
-              color: color,
-            ),
-          ),
-        ],
       ),
     );
   }

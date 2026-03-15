@@ -13,41 +13,16 @@
 	</a>
 </p>
 
-The todo app for people who are tired of todo apps acting like they invented writing things down.
+A local-first task manager built with Flutter that stores everything as plain Markdown files.
 
-## What this thing actually is
+## What it does
 
-`MarkDone!` is a local-first task app built with Flutter that stores projects as plain old Markdown files.
+Each project is a `.md` file with YAML frontmatter for project settings and HTML comments for task metadata. Your data stays on your device in files you can read, edit, move, or sync however you want.
 
-Not a mystery database.
-Not some cloud first productivity cult.
-Not “minimal” in the fake way where the app looks clean but somehow can’t do anything useful.
-
-Each project is a `.md` file with YAML frontmatter for project-level stuff and hidden HTML comments for task state/metadata. That means:
-
-- Your tasks live in Markdown files
-- They stay on your device
-- They are easy to move, back up, sync, git, hoard, or throw into an Obsidian vault
-- You are not locked into some “trust us bro” SQLite blob
-
-So yeah, this is basically a task app that respects the radical concept of **your files being your files**.
-
-## Why this app exists
-
-Because a lot of task apps are annoying in their own special ways.
-
-- some are too minimal and then immediately fall apart when you want one real feature
-- some are bloated productivity casinos
-- some trap your stuff in proprietary junk
-- some are great for notes, but not great as an actual task/reminder system
-
-This exists because:
-
-- Notion is not where I want my task brain to live
-- Todoist is proprietary and I’m not trying to rent my checkboxes forever
-- Obsidian is great for notes and knowledge stuff, but task notifications/reminders are not really its strong suit
-
-So the idea here was simple: use Markdown as the source of truth, keep it local, make it portable, and still have actual app features like reminders, D-Day tracking, archive, and calendar sync.
+- Projects stored as readable Markdown files
+- No cloud accounts, no proprietary databases
+- Works alongside Obsidian, git, Syncthing, or anything that handles files
+- Task metadata is tucked into HTML comments so the Markdown stays clean
 
 ## Screenshots
 
@@ -101,7 +76,14 @@ So the idea here was simple: use Markdown as the source of truth, keep it local,
 		</td>
 	</tr>
 	<tr>
-		<td align="center" colspan="2">
+		<td align="center">
+			<a href="assets/screenshots/project_create.jpg">
+				<img src="assets/screenshots/project_create.jpg" alt="Project Create" width="260" />
+			</a>
+			<br />
+			<strong>Project Create</strong>
+		</td>
+		<td align="center">
 			<a href="assets/screenshots/settings.jpg">
 				<img src="assets/screenshots/settings.jpg" alt="Settings screen" width="260" />
 			</a>
@@ -125,22 +107,22 @@ Download the latest APK from:
 
 ## Features
 
-- local-first Markdown task storage
-- project files you can open and edit outside the app
-- optional custom folder, including an Obsidian-friendly one
-- hidden metadata in HTML comments so the Markdown stays usable
-- custom reminders / local notifications
-- recurring tasks with flexible intervals stored directly in Markdown metadata
-- D-Day project tracking
-- archive support
-- optional calendar sync
-- dark mode and accent color customization because default boring is a disease
+- **Markdown storage** — projects are `.md` files with YAML frontmatter, editable in any text editor
+- **Custom reminders** — local notifications with flexible scheduling
+- **Recurring tasks** — configurable repeat intervals stored in Markdown metadata
+- **D-Day tracking** — countdown badges on projects with a dedicated D-Day overview screen
+- **Drag-to-reorder** — manual task ordering with persistent sort positions
+- **Swipe gestures** — swipe right to complete, swipe left to delete
+- **Project background colors** — per-project color tinting on both the detail page and home cards
+- **Archive** — completed projects can be archived and restored
+- **Calendar sync** — optional integration with device calendar
+- **Custom folder** — point to any directory, including an Obsidian vault
+- **Font size scaling** — adjustable global text size (0.8x to 1.4x)
+- **Dark mode** and accent color customization
 
-## How the files work and stored
+## File format
 
-Projects are stored as Markdown files.
-
-Example File:
+Projects are stored as Markdown files with this structure:
 
 ```md
 ---
@@ -148,53 +130,44 @@ title: Ship something
 created: 2026-03-06
 dday: 2026-03-20
 description: stop overthinking, start shipping
+bg_color: "#33ff6b35"
 sync_calendar: true
 ---
 
-- [ ] finish feature <!-- {"id":"0d6bc622-1f0f-4d61-9e1e-6a0adce3d52b","alarm":"2026-03-10T09:00:00.000","reminder":"2w","recurrence":{"frequency":"daily","interval":3}} -->
-- [x] stop pretending another app will fix my life
+- [ ] finish feature <!-- {"id":"0d6bc622","alarm":"2026-03-10T09:00:00.000","reminder":"2w","recurrence":{"frequency":"daily","interval":3}} -->
+- [x] write tests
 ```
 
-The file is still Markdown.
-The extra app-only stuff is tucked away in HTML comments.
-Portable, inspectable, no nonsense.
+The YAML frontmatter holds project-level settings. Each task is a standard Markdown checkbox. App-specific metadata (IDs, alarms, recurrence) lives in HTML comments after each task line, so the file remains valid Markdown.
 
 ## Building locally
 
-You need the usual Flutter setup first. If Flutter itself is not installed, this repo is obviously not going to magically compile out of pure vibes.
+Requires a working [Flutter](https://docs.flutter.dev/get-started/install) installation.
 
-### 1. Get Flutter dependencies
+### 1. Get dependencies
 
 ```bash
 flutter pub get
 ```
 
-### 2. Build the Android APK
+### 2. Build the APK
 
 ```bash
 flutter build apk --release
 ```
 
-### 3. Grab the APK
+### 3. Install
 
-The built APK should end up here:
+The built APK will be at:
 
 `build/app/outputs/flutter-apk/app-release.apk`
 
-Install that on your device and you’re done.
-
-If you want debug builds or want to run it directly from your machine, do the normal Flutter thing.
+For debug builds, use `flutter run` as usual.
 
 ## Storage
 
-By default, the app stores Markdown files locally in a `markdone` folder.
-
-You can also point it at a custom folder, which is the whole point if you want your tasks living somewhere you already use, like an Obsidian vault.
+By default, files are stored in a local `markdone` folder. You can change this to any directory in Settings — useful if you want your tasks inside an Obsidian vault or a synced folder.
 
 ## Disclaimer
 
-Yes, a lot of the code in this repo was written with AI help.
-
-This was a personal project for my own use case. It does what I wanted, it works for me, and I’m not going to perform fake artisanal hand crafted purity rituals over that.
-
-Still sharing it in case somebody else wants a weird little Markdown powered task app that refuses to worship proprietary nonsense. Yes that is me.
+A good portion of the code in this project was written with AI assistance. This started as a personal tool for my own workflow. Sharing it in case it's useful to someone else.

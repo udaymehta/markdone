@@ -6,6 +6,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/widgets/centered_popup.dart';
+import '../../core/date_formatters.dart';
 import '../../providers/settings_providers.dart';
 import '../../providers/project_providers.dart';
 import '../../providers/theme_provider.dart';
@@ -260,6 +261,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             onTap: () => ref.read(themeModeProvider.notifier).toggle(),
           ),
 
+          if (ref.watch(themeModeProvider) == ThemeMode.dark)
+            _SettingsTile(
+              icon: Icons.contrast_rounded,
+              title: 'AMOLED Dark',
+              subtitle: ref.watch(amoledDarkProvider)
+                  ? 'Pure black background'
+                  : 'Softer grey background',
+              trailing: Switch(
+                value: ref.watch(amoledDarkProvider),
+                onChanged: (v) =>
+                    ref.read(amoledDarkProvider.notifier).setEnabled(v),
+                activeTrackColor: theme.colorScheme.primary,
+              ),
+              onTap: () => ref.read(amoledDarkProvider.notifier).toggle(),
+            ),
+
           _SettingsTile(
             icon: Icons.palette_outlined,
             title: 'Accent Color',
@@ -277,6 +294,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
             onTap: () => _pickAccentColor(context),
           ),
+
+          _FontScaleTile(),
+
+          _DateFormatTile(),
 
           if (showPermissionsSection) ...[
             const Divider(height: 32, indent: 16, endIndent: 16),
@@ -702,6 +723,184 @@ class _SettingsTile extends StatelessWidget {
       trailing: trailing,
       onTap: onTap,
       contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+    );
+  }
+}
+
+class _FontScaleTile extends ConsumerWidget {
+  const _FontScaleTile();
+
+  static const double _min = 0.8;
+  static const double _max = 1.4;
+
+  String _label(double scale) {
+    if (scale <= 0.85) return 'Small';
+    if (scale <= 0.95) return 'Compact';
+    if (scale <= 1.05) return 'Default';
+    if (scale <= 1.15) return 'Large';
+    if (scale <= 1.25) return 'Larger';
+    return 'Largest';
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final scale = ref.watch(fontScaleProvider);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.format_size_rounded, color: theme.colorScheme.primary),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Font Size', style: theme.textTheme.titleMedium),
+                    Text(_label(scale), style: theme.textTheme.bodySmall),
+                  ],
+                ),
+              ),
+              if ((scale - 1.0).abs() > 0.01)
+                TextButton(
+                  onPressed: () =>
+                      ref.read(fontScaleProvider.notifier).setScale(1.0),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: Text(
+                    'Reset',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: theme.colorScheme.primary,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          Row(
+            children: [
+              Text(
+                'A',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              Expanded(
+                child: Slider(
+                  value: scale,
+                  min: _min,
+                  max: _max,
+                  divisions: 6,
+                  onChanged: (v) =>
+                      ref.read(fontScaleProvider.notifier).setScale(v),
+                ),
+              ),
+              Text(
+                'A',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DateFormatTile extends ConsumerWidget {
+  const _DateFormatTile();
+
+  static const _styles = DateFormatStyle.values;
+
+  static String _label(DateFormatStyle s) => switch (s) {
+    DateFormatStyle.mmddyyyy => 'MM/DD/YYYY',
+    DateFormatStyle.ddmmyyyy => 'DD/MM/YYYY',
+    DateFormatStyle.named => 'Named Month',
+  };
+
+  static String _example(DateFormatStyle s) {
+    final sample = DateTime(2026, 3, 16, 9, 0);
+    // Temporarily set style to generate preview, then restore.
+    final prev = MarkdoneDateFormatter.style;
+    MarkdoneDateFormatter.style = s;
+    final result = MarkdoneDateFormatter.formatDate(sample);
+    MarkdoneDateFormatter.style = prev;
+    return result;
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final current = ref.watch(dateFormatStyleProvider);
+
+    return _SettingsTile(
+      icon: Icons.date_range_rounded,
+      title: 'Date Format',
+      subtitle: _label(current),
+      trailing: const Icon(Icons.chevron_right_rounded),
+      onTap: () async {
+        final selected = await showCenteredPopup<DateFormatStyle>(
+          context: context,
+          builder: (ctx) {
+            final popupTheme = Theme.of(ctx);
+            return CenteredPopupContent(
+              scrollable: false,
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Date Format',
+                    style: popupTheme.textTheme.headlineSmall,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Choose how dates are displayed.',
+                    style: popupTheme.textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 16),
+                  for (final s in _styles)
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(_label(s)),
+                      subtitle: Text(
+                        _example(s),
+                        style: popupTheme.textTheme.bodySmall,
+                      ),
+                      trailing: current == s
+                          ? Icon(
+                              Icons.check_circle_rounded,
+                              color: popupTheme.colorScheme.primary,
+                            )
+                          : null,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      onTap: () => Navigator.pop(ctx, s),
+                    ),
+                ],
+              ),
+            );
+          },
+        );
+
+        if (selected != null) {
+          ref.read(dateFormatStyleProvider.notifier).setStyle(selected);
+        }
+      },
     );
   }
 }
