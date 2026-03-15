@@ -70,13 +70,29 @@ class ProjectsNotifier extends AsyncNotifier<List<MasterProject>> {
     final fileService = ref.watch(fileServiceProvider);
     final projects = await fileService.readAllProjects();
 
+    // Apply any pending "Done!" completions queued by the background
+    // notification handler while the app was closed.
+    final withCompletions = await _applyNotificationCompletionQueue(projects);
+
+    // Auto-advance any recurring tasks whose alarm has passed
+    final advancedProjects = await _autoAdvanceOverdueRecurringTodos(
+      withCompletions,
+    );
+
+    // Wire the foreground "Done!" notification action so tapping it while the
+    // app is open immediately toggles the task without going through the queue.
+    NotificationService.onDoneAction = (filePath, todoId) async {
+      if (ref.mounted) await toggleTodo(filePath, todoId);
+    };
+
     // Schedule notifications in the background – don't block UI
-    _scheduleAllNotificationsInBackground(projects);
+    _scheduleAllNotificationsInBackground(advancedProjects);
 
     // Sync calendar changes in the background after fast file load
-    _syncCalendarInBackground(projects);
+    _syncCalendarInBackground(advancedProjects);
 
-    // Watch for external file changes
+    // Watch for external file changes (set up after writes so auto-advance
+    // doesn't trigger an immediate spurious reload)
     _startWatching();
 
     // Cancel watching when provider is disposed
@@ -85,7 +101,7 @@ class ProjectsNotifier extends AsyncNotifier<List<MasterProject>> {
       _archiveWatchSub?.cancel();
     });
 
-    return projects;
+    return advancedProjects;
   }
 
   /// Fire-and-forget notification scheduling so it never blocks build/reload.
@@ -324,6 +340,118 @@ class ProjectsNotifier extends AsyncNotifier<List<MasterProject>> {
     return updatedProject;
   }
 
+  /// Reads the pending-completion queue file that the background notification
+  /// handler writes to when the user taps "Done!" while the app is closed.
+  /// Applies each queued toggle to [projects] and returns the updated list.
+  Future<List<MasterProject>> _applyNotificationCompletionQueue(
+    List<MasterProject> projects,
+  ) async {
+    try {
+      final fileService = ref.read(fileServiceProvider);
+      final basePath = await fileService.effectiveStoragePath;
+      final queueFile = File('$basePath/.markdone_queue');
+      if (!await queueFile.exists()) return projects;
+
+      final contents = await queueFile.readAsString();
+      await queueFile.delete();
+
+      var updatedProjects = projects;
+      for (final rawLine in contents.trim().split('\n')) {
+        final line = rawLine.trim();
+        if (line.isEmpty) continue;
+        final sep = line.indexOf('|||');
+        if (sep < 0) continue;
+        final filePath = line.substring(0, sep);
+        final todoId = line.substring(sep + 3);
+        updatedProjects = await _toggleTodoInProjects(
+          updatedProjects,
+          filePath,
+          todoId,
+        );
+      }
+      return updatedProjects;
+    } catch (_) {
+      return projects;
+    }
+  }
+
+  /// Applies a single toggle (complete or recurring-advance) to [projects]
+  /// without touching Riverpod state — safe to call during [build].
+  Future<List<MasterProject>> _toggleTodoInProjects(
+    List<MasterProject> projects,
+    String filePath,
+    String todoId,
+  ) async {
+    final projectIdx = projects.indexWhere((p) => p.filePath == filePath);
+    if (projectIdx < 0) return projects;
+
+    final project = projects[projectIdx];
+    final todoIdx = project.todos.indexWhere((t) => t.id == todoId);
+    if (todoIdx < 0) return projects;
+
+    final todo = project.todos[todoIdx];
+    final updatedTodo = todo.isRecurring
+        ? _advanceRecurringTodo(todo)
+        : todo.copyWith(isCompleted: true);
+
+    final updatedTodos = List<SubTodo>.from(project.todos);
+    updatedTodos[todoIdx] = updatedTodo;
+
+    final updatedProject = await _persistProjectUpdate(
+      project: project,
+      todos: updatedTodos,
+    );
+
+    final updatedProjects = List<MasterProject>.from(projects);
+    updatedProjects[projectIdx] = updatedProject;
+    return updatedProjects;
+  }
+
+  /// Scans all projects on load and advances any recurring tasks whose alarm
+  /// has already passed, so the user sees up-to-date dates without having to
+  /// manually tap the checkbox.
+  Future<List<MasterProject>> _autoAdvanceOverdueRecurringTodos(
+    List<MasterProject> projects,
+  ) async {
+    final now = DateTime.now();
+    final updatedProjects = <MasterProject>[];
+    var anyChanged = false;
+
+    for (final project in projects) {
+      final hasOverdue = project.todos.any(
+        (t) =>
+            t.isRecurring &&
+            !t.isCompleted &&
+            t.alarm != null &&
+            t.alarm!.isBefore(now),
+      );
+
+      if (!hasOverdue) {
+        updatedProjects.add(project);
+        continue;
+      }
+
+      anyChanged = true;
+      final updatedTodos = project.todos.map((todo) {
+        if (todo.isRecurring &&
+            !todo.isCompleted &&
+            todo.alarm != null &&
+            todo.alarm!.isBefore(now)) {
+          return _advanceRecurringTodo(todo);
+        }
+        return todo;
+      }).toList();
+
+      final updatedProject = await _persistProjectUpdate(
+        project: project,
+        todos: updatedTodos,
+      );
+      updatedProjects.add(updatedProject);
+    }
+
+    return anyChanged ? updatedProjects : projects;
+  }
+
   SubTodo _advanceRecurringTodo(SubTodo todo) {
     final alarm = todo.alarm;
     final recurrence = todo.recurrence;
@@ -352,10 +480,14 @@ class ProjectsNotifier extends AsyncNotifier<List<MasterProject>> {
     final fileService = ref.read(fileServiceProvider);
     try {
       final projects = await fileService.readAllProjects();
-      state = AsyncData(projects);
+      final withCompletions = await _applyNotificationCompletionQueue(projects);
+      final advancedProjects = await _autoAdvanceOverdueRecurringTodos(
+        withCompletions,
+      );
+      state = AsyncData(advancedProjects);
       ref.invalidate(archivedProjectsProvider);
       // Reschedule notifications in the background
-      _scheduleAllNotificationsInBackground(projects);
+      _scheduleAllNotificationsInBackground(advancedProjects);
     } catch (e, st) {
       state = AsyncError(e, st);
     }

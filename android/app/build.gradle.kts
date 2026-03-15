@@ -13,7 +13,7 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    namespace = "com.app.markdone"
+    namespace = "com.udaymehta.markdone"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -28,7 +28,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.app.markdone"
+        applicationId = "com.udaymehta.markdone"
         minSdk = 26
         targetSdk = flutter.targetSdkVersion
         multiDexEnabled = true
@@ -58,6 +58,7 @@ android {
             proguardFiles(getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro")
         }
     }
+
 }
 
 dependencies {

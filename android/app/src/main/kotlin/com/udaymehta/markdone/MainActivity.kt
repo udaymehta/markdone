@@ -1,4 +1,4 @@
-package com.app.markdone
+package com.udaymehta.markdone
 
 import io.flutter.embedding.android.FlutterActivity
 

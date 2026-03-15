@@ -213,12 +213,9 @@ class ProjectCard extends StatelessWidget {
   List<SubTodo> get _previewTodos {
     final pending = project.todos.where((todo) => !todo.isCompleted).toList()
       ..sort((a, b) {
-        if (a.alarm != null && b.alarm != null) {
-          return a.alarm!.compareTo(b.alarm!);
-        }
-        if (a.alarm != null) return -1;
-        if (b.alarm != null) return 1;
-        return a.lineIndex.compareTo(b.lineIndex);
+        final aOrder = a.sortOrder ?? a.lineIndex;
+        final bOrder = b.sortOrder ?? b.lineIndex;
+        return aOrder.compareTo(bOrder);
       });
 
     final completed = project.todos.where((todo) => todo.isCompleted).toList()

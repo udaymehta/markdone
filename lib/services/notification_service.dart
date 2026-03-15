@@ -5,11 +5,56 @@ import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:flutter_timezone/flutter_timezone.dart';
 import '../models/sub_todo.dart';
 import '../models/master_project.dart';
+import 'recurrence_service.dart';
+
+/// Background notification action handler — must be a top-level function so
+/// it can run in a separate isolate when the app is not in the foreground.
+///
+/// When the user taps "Done!" while the app is backgrounded/killed, this writes
+/// a pending-completion entry to a queue file.  The next time the app opens,
+/// [ProjectsNotifier] reads that queue and applies the toggles.
+@pragma('vm:entry-point')
+Future<void> handleBackgroundNotificationResponse(
+  NotificationResponse response,
+) async {
+  if (response.actionId != NotificationService.doneActionId) return;
+  final payload = response.payload;
+  if (payload == null) return;
+
+  final sep = payload.indexOf('|||');
+  if (sep < 0) return;
+
+  final filePath = payload.substring(0, sep);
+  final todoId = payload.substring(sep + 3);
+
+  // Write the pending completion to a queue file that sits alongside
+  // the project .md files.  The app processes this on its next start.
+  try {
+    final queueFile = File('${File(filePath).parent.path}/.markdone_queue');
+    await queueFile.writeAsString(
+      '$filePath|||$todoId\n',
+      mode: FileMode.append,
+    );
+  } catch (_) {
+    // Silently ignore I/O errors — the queue is best-effort.
+  }
+}
 
 /// Manages Android system-level notifications for sub-todos and projects.
 class NotificationService {
   static const String _remindersChannelId = 'markdone_reminders';
   static const String _instantChannelId = 'markdone_instant';
+
+  /// Action ID sent with every notification's "Done!" button.
+  static const String doneActionId = 'done';
+
+  /// How many future occurrences to pre-schedule for recurring tasks so that
+  /// notifications keep firing even when the app is not opened.
+  static const int _maxRecurringPreSchedule = 10;
+
+  /// Set this from [ProjectsNotifier] so that a foreground "Done!" tap is
+  /// handled immediately without going through the queue file.
+  static Future<void> Function(String filePath, String todoId)? onDoneAction;
 
   static final NotificationService _instance = NotificationService._();
   factory NotificationService() => _instance;
@@ -58,16 +103,12 @@ class NotificationService {
     // Initialize timezone database and set device's local timezone
     tz_data.initializeTimeZones();
     try {
-      // FlutterTimezone.getLocalTimezone() returns TimezoneInfo with .identifier
       final tzInfo = await FlutterTimezone.getLocalTimezone();
       tz.setLocalLocation(_resolveLocation(tzInfo.identifier));
     } catch (e) {
-      // Fallback: try UTC rather than a hard-coded timezone
       try {
         tz.setLocalLocation(tz.getLocation('UTC'));
-      } catch (_) {
-        // Absolute last resort
-      }
+      } catch (_) {}
     }
 
     const androidSettings = AndroidInitializationSettings(
@@ -82,9 +123,12 @@ class NotificationService {
     await _plugin.initialize(
       initSettings,
       onDidReceiveNotificationResponse: _onNotificationTap,
+      // Background isolate handler for action button taps when app is not
+      // in the foreground.
+      onDidReceiveBackgroundNotificationResponse:
+          handleBackgroundNotificationResponse,
     );
 
-    // On Android, create notification channels and request permissions
     if (Platform.isAndroid) {
       final androidPlugin = _plugin
           .resolvePlatformSpecificImplementation<
@@ -109,10 +153,7 @@ class NotificationService {
           ),
         );
 
-        // Request notification permission (Android 13+)
         await androidPlugin.requestNotificationsPermission();
-
-        // Request exact alarm permission (Android 12+)
         await androidPlugin.requestExactAlarmsPermission();
       }
     }
@@ -125,7 +166,73 @@ class NotificationService {
     if (!_initialized) await init();
   }
 
-  /// Show a debug message as an instantaneous notification
+  /// Called when the user taps a notification or one of its action buttons
+  /// while the app is in the foreground (or is brought to the foreground).
+  void _onNotificationTap(NotificationResponse response) {
+    if (response.actionId == doneActionId) {
+      final payload = response.payload;
+      if (payload == null) return;
+      final sep = payload.indexOf('|||');
+      if (sep < 0) return;
+      final filePath = payload.substring(0, sep);
+      final todoId = payload.substring(sep + 3);
+      // Delegate to whatever ProjectsNotifier has wired up.
+      onDoneAction?.call(filePath, todoId);
+    }
+    // Other taps (notification body): no-op for now — reserved for deep-link.
+  }
+
+  /// Schedules a notification with exact alarms, falling back to inexact if the
+  /// permission is denied.
+  Future<void> _scheduleZonedWithFallback({
+    required int id,
+    required String title,
+    required String body,
+    required tz.TZDateTime scheduledDate,
+    required String payload,
+    List<AndroidNotificationAction> actions = const [],
+  }) async {
+    final details = NotificationDetails(
+      android: AndroidNotificationDetails(
+        _remindersChannelId,
+        'Task Reminders',
+        channelDescription: 'Notifications for scheduled task reminders',
+        importance: Importance.high,
+        priority: Priority.high,
+        showWhen: true,
+        actions: actions,
+      ),
+    );
+
+    try {
+      await _plugin.zonedSchedule(
+        id,
+        title,
+        body,
+        scheduledDate,
+        details,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        payload: payload,
+      );
+    } catch (_) {
+      // Fallback to inexact if exact alarms are denied.
+      await _plugin.zonedSchedule(
+        id,
+        title,
+        body,
+        scheduledDate,
+        details,
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        payload: payload,
+      );
+    }
+  }
+
+  /// Show a debug message as an instantaneous notification.
   Future<void> showDebugNotification(String message) async {
     await _ensureInitialized();
     final debugId = DateTime.now().millisecondsSinceEpoch.remainder(100000);
@@ -145,11 +252,11 @@ class NotificationService {
     );
   }
 
-  void _onNotificationTap(NotificationResponse response) {
-    // Reserved for future deep-link handling from notifications.
-  }
-
-  /// Schedules the main notification for a sub-todo's reminder time.
+  /// Schedules the main alarm notification(s) for a sub-todo.
+  ///
+  /// For recurring tasks, up to [_maxRecurringPreSchedule] future occurrences
+  /// are pre-scheduled so that notifications keep firing even when the app is
+  /// not opened between occurrences.
   Future<void> scheduleSubTodoAlarm({
     required SubTodo todo,
     required String projectTitle,
@@ -159,62 +266,67 @@ class NotificationService {
 
     if (todo.alarm == null) return;
 
-    final scheduledDate = tz.TZDateTime.from(todo.alarm!, tz.local);
     final now = tz.TZDateTime.now(tz.local);
+    final baseId = todo.id.hashCode.abs() % 2147483647;
+    // Payload encodes both the file path and the todo ID so the "Done!" handler
+    // knows exactly which task to toggle.
+    final payload = '$projectFilePath|||${todo.id}';
+    const actions = [
+      AndroidNotificationAction(
+        doneActionId,
+        'Done!',
+        cancelNotification: true,
+      ),
+    ];
 
-    if (scheduledDate.isBefore(now)) {
+    if (!todo.isRecurring) {
+      // Non-recurring: one notification at the alarm time.
+      final scheduledDate = tz.TZDateTime.from(todo.alarm!, tz.local);
+      if (scheduledDate.isBefore(now)) return;
+      await _scheduleZonedWithFallback(
+        id: baseId,
+        title: todo.title,
+        body: 'Project: $projectTitle',
+        scheduledDate: scheduledDate,
+        payload: payload,
+        actions: actions,
+      );
       return;
     }
 
-    final id = todo.id.hashCode.abs() % 2147483647; // Keep within int32 range
+    // Recurring: pre-schedule the next N occurrences so notifications fire
+    // even if the app is never opened between recurrences.
+    DateTime currentAlarm = todo.alarm!;
+    int scheduledCount = 0;
+    int maxIter =
+        _maxRecurringPreSchedule * 3; // guard against pathological rules
 
-    try {
-      await _plugin.zonedSchedule(
-        id,
-        projectTitle,
-        todo.title,
-        scheduledDate,
-        const NotificationDetails(
-          android: AndroidNotificationDetails(
-            _remindersChannelId,
-            'Task Reminders',
-            channelDescription: 'Notifications for scheduled task reminders',
-            importance: Importance.high,
-            priority: Priority.high,
-            showWhen: true,
-          ),
-        ),
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
-        payload: projectFilePath,
+    while (scheduledCount < _maxRecurringPreSchedule && maxIter-- > 0) {
+      final scheduledDate = tz.TZDateTime.from(currentAlarm, tz.local);
+
+      if (scheduledDate.isAfter(now)) {
+        await _scheduleZonedWithFallback(
+          id: (baseId + scheduledCount) % 2147483647,
+          title: todo.title,
+          body: 'Project: $projectTitle',
+          scheduledDate: scheduledDate,
+          payload: payload,
+          actions: actions,
+        );
+        scheduledCount++;
+      }
+
+      final next = RecurrenceService.nextOccurrence(
+        alarm: currentAlarm,
+        rule: todo.recurrence!,
+        after: currentAlarm,
       );
-    } catch (e) {
-      // Fallback to inexact if exact alarms are denied
-      await _plugin.zonedSchedule(
-        id,
-        projectTitle,
-        todo.title,
-        scheduledDate,
-        const NotificationDetails(
-          android: AndroidNotificationDetails(
-            _remindersChannelId,
-            'Task Reminders',
-            channelDescription: 'Notifications for scheduled task reminders',
-            importance: Importance.high,
-            priority: Priority.high,
-            showWhen: true,
-          ),
-        ),
-        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
-        payload: projectFilePath,
-      );
+      if (next == null) break;
+      currentAlarm = next;
     }
   }
 
-  /// Schedules a heads-up reminder notification (alarm - reminderBefore).
+  /// Schedules a heads-up reminder notification (alarm − reminderBefore).
   Future<void> scheduleSubTodoReminder({
     required SubTodo todo,
     required String projectTitle,
@@ -228,67 +340,41 @@ class NotificationService {
     final scheduledDate = tz.TZDateTime.from(reminderTime, tz.local);
     final now = tz.TZDateTime.now(tz.local);
 
-    if (scheduledDate.isBefore(now)) {
-      return;
-    }
+    if (scheduledDate.isBefore(now)) return;
 
-    // Use a different ID for the reminder
     final id = (todo.id.hashCode.abs() + 1000000) % 2147483647;
     final reminderLabel = todo.reminderLabel ?? todo.reminderString;
+    final payload = '$projectFilePath|||${todo.id}';
+    const actions = [
+      AndroidNotificationAction(
+        doneActionId,
+        'Done!',
+        cancelNotification: true,
+      ),
+    ];
 
-    try {
-      await _plugin.zonedSchedule(
-        id,
-        '⏰ Upcoming: $projectTitle',
-        '${todo.title} (in $reminderLabel)',
-        scheduledDate,
-        const NotificationDetails(
-          android: AndroidNotificationDetails(
-            _remindersChannelId,
-            'Task Reminders',
-            channelDescription: 'Notifications for scheduled task reminders',
-            importance: Importance.high,
-            priority: Priority.high,
-            showWhen: true,
-          ),
-        ),
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
-        payload: projectFilePath,
-      );
-    } catch (e) {
-      // Fallback to inexact if exact alarms are denied
-      await _plugin.zonedSchedule(
-        id,
-        '⏰ Upcoming: $projectTitle',
-        '${todo.title} (in $reminderLabel)',
-        scheduledDate,
-        const NotificationDetails(
-          android: AndroidNotificationDetails(
-            _remindersChannelId,
-            'Task Reminders',
-            channelDescription: 'Notifications for scheduled task reminders',
-            importance: Importance.high,
-            priority: Priority.high,
-            showWhen: true,
-          ),
-        ),
-        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
-        payload: projectFilePath,
-      );
-    }
+    await _scheduleZonedWithFallback(
+      id: id,
+      title: todo.title,
+      body: 'Due in $reminderLabel',
+      scheduledDate: scheduledDate,
+      payload: payload,
+      actions: actions,
+    );
   }
 
-  /// Cancels all notifications for a sub-todo.
+  /// Cancels all notifications for a sub-todo, including any pre-scheduled
+  /// recurring occurrences.
   Future<void> cancelSubTodoNotifications(SubTodo todo) async {
     await _ensureInitialized();
 
-    final alarmId = todo.id.hashCode.abs() % 2147483647;
+    final baseAlarmId = todo.id.hashCode.abs() % 2147483647;
     final reminderId = (todo.id.hashCode.abs() + 1000000) % 2147483647;
-    await _plugin.cancel(alarmId);
+
+    // Cancel the base alarm and all pre-scheduled recurring occurrences.
+    for (int i = 0; i < _maxRecurringPreSchedule; i++) {
+      await _plugin.cancel((baseAlarmId + i) % 2147483647);
+    }
     await _plugin.cancel(reminderId);
   }
 

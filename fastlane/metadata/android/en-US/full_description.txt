@@ -1,0 +1,28 @@
+MarkDone! is a local-first task manager that stores everything as plain Markdown files — no cloud accounts, no proprietary databases, no lock-in.
+
+Each project is a <code>.md</code> file with YAML frontmatter for settings and standard Markdown checkboxes for tasks. App metadata (IDs, alarms, recurrence rules) lives in HTML comments after each task line, so the file stays valid, readable Markdown.
+
+<b>Features</b>
+
+<ul>
+<li><b>Markdown storage</b> — projects are plain <code>.md</code> files, editable in any text editor</li>
+<li><b>Custom reminders</b> — local notifications with flexible scheduling</li>
+<li><b>Recurring tasks</b> — configurable repeat intervals; dates auto-advance on app open</li>
+<li><b>D-Day tracking</b> — countdown badges and a dedicated D-Day overview screen</li>
+<li><b>Drag-to-reorder</b> — manual task ordering with persistent sort positions</li>
+<li><b>Swipe gestures</b> — swipe right to complete, swipe left to delete</li>
+<li><b>Project background colors</b> — per-project color tinting on cards and detail pages</li>
+<li><b>Archive</b> — completed projects can be archived and restored</li>
+<li><b>Calendar sync</b> — optional integration with your device calendar</li>
+<li><b>Custom folder</b> — point to any directory, including an Obsidian vault or synced folder</li>
+<li><b>Font size scaling</b> — adjustable global text size (0.8x to 1.4x)</li>
+<li><b>AMOLED dark mode</b> and accent color customization</li>
+</ul>
+
+<b>Works with your existing tools</b>
+
+Because tasks are stored as standard Markdown files, MarkDone! works seamlessly alongside Obsidian, git, Syncthing, or any other tool that handles plain text files. Your data is always yours.
+
+<b>Permissions</b>
+
+MarkDone! requests only the permissions it needs: notifications for reminders, calendar access if you enable calendar sync, and storage access to read and write your Markdown files.
