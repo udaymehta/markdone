@@ -133,10 +133,12 @@ class SubTodoTile extends StatelessWidget {
           decoration: BoxDecoration(borderRadius: BorderRadius.circular(12)),
           child: Row(
             children: [
-              AnimatedCheckbox(
-                value: todo.isCompleted,
-                onChanged: (_) => onToggle(),
-              ),
+              todo.isRecurring
+                  ? _RecurringRepeatButton(onTap: onToggle)
+                  : AnimatedCheckbox(
+                      value: todo.isCompleted,
+                      onChanged: (_) => onToggle(),
+                    ),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -175,6 +177,33 @@ class SubTodoTile extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// A tappable rounded-square repeat icon shown in place of the checkbox for
+/// recurring tasks.  Tapping it triggers the same [onTap] callback that the
+/// checkbox would — which advances the task to its next occurrence.
+class _RecurringRepeatButton extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _RecurringRepeatButton({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    const size = 24.0;
+    final color = Theme.of(context).colorScheme.primary;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(size * 0.3),
+          border: Border.all(color: color.withValues(alpha: 0.55), width: 2),
+        ),
+        child: Icon(Icons.repeat_rounded, size: size * 0.65, color: color),
       ),
     );
   }

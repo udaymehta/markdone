@@ -1,0 +1,1 @@
+Recurring tasks now auto-advance dates on app open. Notifications show task title as header with project as sub-text, pre-schedule up to 10 future occurrences, and include a Done! action button. Home screen task preview respects custom drag sort order.
