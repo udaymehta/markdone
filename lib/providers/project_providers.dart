@@ -737,31 +737,35 @@ final archivedProjectsProvider = FutureProvider<List<MasterProject>>((
 
 /// Provider for active projects, keeping completed ones at the bottom.
 final sortedProjectsProvider = Provider<List<MasterProject>>((ref) {
-  final projects = List<MasterProject>.from(
-    ref.watch(projectsProvider).value ?? [],
-  );
-  final indexedProjects = projects.indexed.toList();
+  final projectsAsync = ref.watch(projectsProvider);
+  final projects = projectsAsync.value ?? [];
 
-  indexedProjects.sort((a, b) {
-    final completionCompare = (a.$2.isCompletedProject ? 1 : 0).compareTo(
-      b.$2.isCompletedProject ? 1 : 0,
-    );
-    if (completionCompare != 0) return completionCompare;
+  if (projects.isEmpty) return [];
 
-    final aHasDday = a.$2.dday != null;
-    final bHasDday = b.$2.dday != null;
-    final ddayPresenceCompare = (bHasDday ? 1 : 0).compareTo(aHasDday ? 1 : 0);
-    if (ddayPresenceCompare != 0) return ddayPresenceCompare;
+  final sorted = List<MasterProject>.from(projects);
+
+  sorted.sort((a, b) {
+    final aCompleted = a.isCompletedProject;
+    final bCompleted = b.isCompletedProject;
+    if (aCompleted != bCompleted) {
+      return aCompleted ? 1 : -1;
+    }
+
+    final aHasDday = a.dday != null;
+    final bHasDday = b.dday != null;
+    if (aHasDday != bHasDday) {
+      return bHasDday ? 1 : -1;
+    }
 
     if (aHasDday && bHasDday) {
-      final ddayOrder = _compareDdayPriority(a.$2, b.$2);
+      final ddayOrder = _compareDdayPriority(a, b);
       if (ddayOrder != 0) return ddayOrder;
     }
 
-    return a.$1.compareTo(b.$1);
+    return a.title.compareTo(b.title);
   });
 
-  return [for (final entry in indexedProjects) entry.$2];
+  return sorted;
 });
 
 int _compareDdayPriority(MasterProject a, MasterProject b) {
@@ -784,7 +788,13 @@ int _compareDdayPriority(MasterProject a, MasterProject b) {
 /// Provider for projects with D-Day events, sorted by nearest upcoming date first.
 final ddayProjectsProvider = Provider<List<MasterProject>>((ref) {
   final projects = ref.watch(sortedProjectsProvider);
-  final ddayProjects = projects.where((p) => p.dday != null).toList();
+
+  final ddayProjects = <MasterProject>[];
+  for (final p in projects) {
+    if (p.dday != null) {
+      ddayProjects.add(p);
+    }
+  }
 
   ddayProjects.sort(_compareDdayPriority);
 
@@ -794,7 +804,8 @@ final ddayProjectsProvider = Provider<List<MasterProject>>((ref) {
 /// Provider for upcoming sub-todo alarms across all projects.
 final upcomingAlarmsProvider =
     Provider<List<({MasterProject project, SubTodo todo})>>((ref) {
-      final projects = ref.watch(projectsProvider).value ?? [];
+      final projectsAsync = ref.watch(projectsProvider);
+      final projects = projectsAsync.value ?? [];
       final now = DateTime.now();
       final items = <({MasterProject project, SubTodo todo})>[];
 
@@ -808,6 +819,8 @@ final upcomingAlarmsProvider =
         }
       }
 
-      items.sort((a, b) => a.todo.alarm!.compareTo(b.todo.alarm!));
+      if (items.length > 1) {
+        items.sort((a, b) => a.todo.alarm!.compareTo(b.todo.alarm!));
+      }
       return items;
     });

@@ -1,8 +1,7 @@
 import 'dart:io';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
-import 'package:timezone/data/latest.dart' as tz_data;
-import 'package:flutter_timezone/flutter_timezone.dart';
+import '../core/timezone_utils.dart';
 import '../models/sub_todo.dart';
 import '../models/master_project.dart';
 import 'recurrence_service.dart';
@@ -65,51 +64,11 @@ class NotificationService {
 
   bool _initialized = false;
 
-  /// Well-known timezone aliases that the tz database doesn't include.
-  /// Some devices (especially Samsung) report deprecated IANA names.
-  static const _tzAliases = <String, String>{
-    'Asia/Calcutta': 'Asia/Kolkata',
-    'US/Eastern': 'America/New_York',
-    'US/Central': 'America/Chicago',
-    'US/Mountain': 'America/Denver',
-    'US/Pacific': 'America/Los_Angeles',
-    'US/Hawaii': 'Pacific/Honolulu',
-    'US/Alaska': 'America/Anchorage',
-    'US/Arizona': 'America/Phoenix',
-    'Canada/Eastern': 'America/Toronto',
-    'Canada/Central': 'America/Winnipeg',
-    'Canada/Pacific': 'America/Vancouver',
-    'Europe/Kiev': 'Europe/Kyiv',
-    'Pacific/Samoa': 'Pacific/Pago_Pago',
-  };
-
-  /// Resolves a timezone identifier, falling back to known aliases.
-  static tz.Location _resolveLocation(String identifier) {
-    try {
-      return tz.getLocation(identifier);
-    } catch (_) {
-      final alias = _tzAliases[identifier];
-      if (alias != null) {
-        return tz.getLocation(alias);
-      }
-      rethrow;
-    }
-  }
-
   /// Initialize the notification plugin.
   Future<void> init() async {
     if (_initialized) return;
 
-    // Initialize timezone database and set device's local timezone
-    tz_data.initializeTimeZones();
-    try {
-      final tzInfo = await FlutterTimezone.getLocalTimezone();
-      tz.setLocalLocation(_resolveLocation(tzInfo.identifier));
-    } catch (e) {
-      try {
-        tz.setLocalLocation(tz.getLocation('UTC'));
-      } catch (_) {}
-    }
+    await initializeTimezone();
 
     const androidSettings = AndroidInitializationSettings(
       '@mipmap/ic_launcher',

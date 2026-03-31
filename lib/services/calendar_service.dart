@@ -2,8 +2,7 @@ import 'dart:io';
 import 'package:device_calendar/device_calendar.dart';
 import 'package:flutter/foundation.dart';
 import 'package:timezone/timezone.dart' as tz;
-import 'package:timezone/data/latest.dart' as tz_data;
-import 'package:flutter_timezone/flutter_timezone.dart';
+import '../core/timezone_utils.dart';
 import '../models/sub_todo.dart';
 import '../models/master_project.dart';
 
@@ -58,46 +57,10 @@ class CalendarService {
     }
   }
 
-  /// Ensures the timezone database is initialized and tz.local is set to the
-  /// device's actual timezone. This guards against CalendarService being used
-  /// before NotificationService.init() or tz.local defaulting to UTC.
-  /// Well-known timezone aliases that the tz database doesn't include.
-  /// Some devices (especially Samsung) report deprecated IANA names.
-  static const _tzAliases = <String, String>{
-    'Asia/Calcutta': 'Asia/Kolkata',
-    'US/Eastern': 'America/New_York',
-    'US/Central': 'America/Chicago',
-    'US/Mountain': 'America/Denver',
-    'US/Pacific': 'America/Los_Angeles',
-    'US/Hawaii': 'Pacific/Honolulu',
-    'US/Alaska': 'America/Anchorage',
-    'US/Arizona': 'America/Phoenix',
-    'Canada/Eastern': 'America/Toronto',
-    'Canada/Central': 'America/Winnipeg',
-    'Canada/Pacific': 'America/Vancouver',
-    'Europe/Kiev': 'Europe/Kyiv',
-    'Pacific/Samoa': 'Pacific/Pago_Pago',
-  };
-
-  /// Resolves a timezone identifier, falling back to known aliases.
-  static tz.Location _resolveLocation(String identifier) {
-    try {
-      return tz.getLocation(identifier);
-    } catch (_) {
-      final alias = _tzAliases[identifier];
-      if (alias != null) {
-        return tz.getLocation(alias);
-      }
-      rethrow;
-    }
-  }
-
   Future<void> _ensureTimezone() async {
     if (_tzInitialized) return;
     try {
-      tz_data.initializeTimeZones();
-      final tzInfo = await FlutterTimezone.getLocalTimezone();
-      tz.setLocalLocation(_resolveLocation(tzInfo.identifier));
+      await initializeTimezone();
       _log('[CalendarService] tz.local set to: ${tz.local.name}');
     } catch (e) {
       _log('[CalendarService] _ensureTimezone error: $e');
