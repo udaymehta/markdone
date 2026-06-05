@@ -19,82 +19,28 @@ A local-first task manager with habit tracking, built with Flutter. Projects and
 
 Each project is a `.md` file with YAML frontmatter for project settings and HTML comments for task metadata. Habits are stored in a plain CSV file with completion dates, reminders, and custom notification messages. Your data stays on your device in files you can read, edit, move, or sync however you want.
 
-- Projects stored as readable Markdown files
-- Habits stored as CSV with daily check-in heatmaps
-- No cloud accounts, no proprietary databases
-- Works alongside Obsidian, git, Syncthing, or anything that handles files
-- Task metadata is tucked into HTML comments so the Markdown stays clean
-
 ## Screenshots
 
 <table>
 	<tr>
 		<td align="center">
-			<a href="assets/screenshots/homepage.jpg">
-				<img src="assets/screenshots/homepage.jpg" alt="Home screen" width="260" />
+			<a href="assets/screenshots/demo_projects.jpg">
+				<img src="assets/screenshots/demo_projects.jpg" alt="Home screen" width="260" />
 			</a>
 			<br />
-			<strong>Home</strong>
+			<strong>Projects</strong>
 		</td>
 		<td align="center">
-			<a href="assets/screenshots/task_create.jpg">
-				<img src="assets/screenshots/task_create.jpg" alt="Create task screen" width="260" />
+			<a href="assets/screenshots/demo_habits_list.jpg">
+				<img src="assets/screenshots/demo_habit_list.jpg" alt="Create task screen" width="260" />
 			</a>
 			<br />
-			<strong>Create Task</strong>
-		</td>
-	</tr>
-	<tr>
-		<td align="center">
-			<a href="assets/screenshots/todo_personal.jpg">
-				<img src="assets/screenshots/todo_personal.jpg" alt="Personal project screen" width="260" />
-			</a>
-			<br />
-			<strong>Personal Project</strong>
-		</td>
-		<td align="center">
-			<a href="assets/screenshots/todo_taxes.jpg">
-				<img src="assets/screenshots/todo_taxes.jpg" alt="Taxes project screen" width="260" />
-			</a>
-			<br />
-			<strong>Project Tasks</strong>
-		</td>
-	</tr>
-	<tr>
-		<td align="center">
-			<a href="assets/screenshots/dday.jpg">
-				<img src="assets/screenshots/dday.jpg" alt="D-Day tracking screen" width="260" />
-			</a>
-			<br />
-			<strong>D-Day</strong>
-		</td>
-		<td align="center">
-			<a href="assets/screenshots/archive.jpg">
-				<img src="assets/screenshots/archive.jpg" alt="Archive screen" width="260" />
-			</a>
-			<br />
-			<strong>Archive</strong>
-		</td>
-	</tr>
-	<tr>
-		<td align="center">
-			<a href="assets/screenshots/project_create.jpg">
-				<img src="assets/screenshots/project_create.jpg" alt="Project Create" width="260" />
-			</a>
-			<br />
-			<strong>Project Create</strong>
-		</td>
-		<td align="center">
-			<a href="assets/screenshots/settings.jpg">
-				<img src="assets/screenshots/settings.jpg" alt="Settings screen" width="260" />
-			</a>
-			<br />
-			<strong>Settings</strong>
+			<strong>Habits</strong>
 		</td>
 	</tr>
 </table>
 
-Click any screenshot to view it full size.
+#### Check [assets/screenshots](./assets/screenshots) folder more!!!
 
 ## Install
 
