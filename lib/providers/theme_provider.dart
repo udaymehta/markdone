@@ -116,7 +116,7 @@ class DateFormatStyleNotifier extends Notifier<DateFormatStyle> {
     final settings = ref.read(settingsServiceProvider);
     final stored = settings.getDateFormat();
     return DateFormatStyle.values.asNameMap()[stored] ??
-        DateFormatStyle.mmddyyyy;
+        DateFormatStyle.ddmmyyyy;
   }
 
   void setStyle(DateFormatStyle value) {

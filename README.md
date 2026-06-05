@@ -13,13 +13,14 @@
 	</a>
 </p>
 
-A local-first task manager built with Flutter that stores everything as plain Markdown files.
+A local-first task manager with habit tracking, built with Flutter. Projects and habits are stored as plain Markdown files and CSV — no cloud, no proprietary databases.
 
 ## What it does
 
-Each project is a `.md` file with YAML frontmatter for project settings and HTML comments for task metadata. Your data stays on your device in files you can read, edit, move, or sync however you want.
+Each project is a `.md` file with YAML frontmatter for project settings and HTML comments for task metadata. Habits are stored in a plain CSV file with completion dates, reminders, and custom notification messages. Your data stays on your device in files you can read, edit, move, or sync however you want.
 
 - Projects stored as readable Markdown files
+- Habits stored as CSV with daily check-in heatmaps
 - No cloud accounts, no proprietary databases
 - Works alongside Obsidian, git, Syncthing, or anything that handles files
 - Task metadata is tucked into HTML comments so the Markdown stays clean
@@ -108,6 +109,9 @@ Download the latest APK from:
 ## Features
 
 - **Markdown storage** — projects are `.md` files with YAML frontmatter, editable in any text editor
+- **Habit tracking** — daily check-in heatmaps, weekly trend charts, and streak counters
+- **Habit notifications** — configurable daily reminders with custom notification messages and Done/Not Done actions
+- **Long-press habit reorder** — drag to reorder habits on the habits screen
 - **Custom reminders** — local notifications with flexible scheduling
 - **Recurring tasks** — configurable repeat intervals stored in Markdown metadata
 - **D-Day tracking** — countdown badges on projects with a dedicated D-Day overview screen
@@ -118,7 +122,7 @@ Download the latest APK from:
 - **Calendar sync** — optional integration with device calendar
 - **Custom folder** — point to any directory, including an Obsidian vault
 - **Font size scaling** — adjustable global text size (0.8x to 1.4x)
-- **Dark mode** and accent color customization
+- **Dark mode** (including AMOLED pure-black) and accent color customization
 
 ## File format
 
@@ -140,6 +144,8 @@ sync_calendar: true
 
 The YAML frontmatter holds project-level settings. Each task is a standard Markdown checkbox. App-specific metadata (IDs, alarms, recurrence) lives in HTML comments after each task line, so the file remains valid Markdown.
 
+Habits are stored in a separate CSV file with columns for name, color, reminder settings, notification message, sort order, and daily completion dates.
+
 ## Building locally
 
 Requires a working [Flutter](https://docs.flutter.dev/get-started/install) installation.
@@ -153,14 +159,14 @@ flutter pub get
 ### 2. Build the APK
 
 ```bash
-flutter build apk --release
+flutter build apk --release --split-per-abi --obfuscate --split-debug-info=build/app/outputs/symbols
 ```
+
+This produces three split APKs (`arm64-v8a`, `armeabi-v7a`, `x86_64`) in `build/app/outputs/flutter-apk/`.
 
 ### 3. Install
 
-The built APK will be at:
-
-`build/app/outputs/flutter-apk/app-release.apk`
+Install the APK that matches your device's architecture. Most modern Android phones use `arm64-v8a`.
 
 For debug builds, use `flutter run` as usual.
 

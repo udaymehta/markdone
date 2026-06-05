@@ -25,10 +25,12 @@ class SubTodoTile extends StatelessWidget {
     this.dragHandle,
   });
 
-  Widget _buildMetadata(BuildContext context) {
+  Widget _buildMetadata(BuildContext context, {bool overdue = false}) {
     final baseColor = todo.isCompleted
         ? Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.55)
-        : Theme.of(context).colorScheme.onSurfaceVariant;
+        : overdue
+            ? Theme.of(context).colorScheme.error.withValues(alpha: 0.6)
+            : Theme.of(context).colorScheme.onSurfaceVariant;
     final baseStyle = Theme.of(
       context,
     ).textTheme.bodySmall?.copyWith(color: baseColor, height: 1.35);
@@ -64,9 +66,13 @@ class SubTodoTile extends StatelessWidget {
     );
   }
 
+  bool get _isOverdue =>
+      !todo.isCompleted && todo.alarm != null && todo.alarm!.isBefore(DateTime.now());
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final overdue = _isOverdue;
 
     return Dismissible(
       key: ValueKey(todo.id),
@@ -151,15 +157,15 @@ class SubTodoTile extends StatelessWidget {
                             ? TextDecoration.lineThrough
                             : null,
                         color: todo.isCompleted
-                            ? theme.colorScheme.onSurfaceVariant.withValues(
-                                alpha: 0.5,
-                              )
-                            : null,
+                            ? theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)
+                            : overdue
+                                ? theme.colorScheme.error.withValues(alpha: 0.7)
+                                : null,
                       ),
                     ),
                     if (todo.alarm != null) ...[
                       const SizedBox(height: 2),
-                      _buildMetadata(context),
+                      _buildMetadata(context, overdue: overdue),
                     ],
                   ],
                 ),

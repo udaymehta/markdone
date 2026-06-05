@@ -10,11 +10,11 @@ class AppColors {
   static const Color accentLight = Color(0xFFFF9A6C);
   static const Color accentDark = Color(0xFFD94F1E);
 
-  // Dark theme surfaces (softer dark grey)
-  static const Color darkSurface = Color(0xFF1C1C24);
-  static const Color darkSurfaceVariant = Color(0xFF262630);
-  static const Color darkCard = Color(0xFF23232C);
-  static const Color darkCardHover = Color(0xFF2D2D38);
+  // Dark theme surfaces (deep neutral grey — darker than original, not quite AMOLED)
+  static const Color darkSurface = Color(0xFF121212);
+  static const Color darkSurfaceVariant = Color(0xFF1A1A1A);
+  static const Color darkCard = Color(0xFF161616);
+  static const Color darkCardHover = Color(0xFF1E1E1E);
 
   // AMOLED surfaces (pure black for OLED screens)
   static const Color amoledSurface = Color(0xFF000000);

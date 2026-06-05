@@ -10,12 +10,14 @@ class ProjectCard extends StatelessWidget {
   final MasterProject project;
   final VoidCallback onTap;
   final VoidCallback? onLongPress;
+  final bool hideCompleted;
 
   const ProjectCard({
     super.key,
     required this.project,
     required this.onTap,
     this.onLongPress,
+    this.hideCompleted = false,
   });
 
   Color? get _projectColor {
@@ -217,6 +219,8 @@ class ProjectCard extends StatelessWidget {
         final bOrder = b.sortOrder ?? b.lineIndex;
         return aOrder.compareTo(bOrder);
       });
+
+    if (hideCompleted) return pending.take(2).toList();
 
     final completed = project.todos.where((todo) => todo.isCompleted).toList()
       ..sort((a, b) => a.lineIndex.compareTo(b.lineIndex));

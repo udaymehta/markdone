@@ -16,7 +16,7 @@ class MarkdoneDateFormatter {
   const MarkdoneDateFormatter._();
 
   /// The current display style. Set once from `app.dart` on each build.
-  static DateFormatStyle style = DateFormatStyle.mmddyyyy;
+  static DateFormatStyle style = DateFormatStyle.ddmmyyyy;
 
   // ── Named-style helpers ──
   static final DateFormat _shortMonth = DateFormat('MMM');

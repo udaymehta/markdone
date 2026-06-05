@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../core/color_utils.dart';
+import '../../services/app_icon_service.dart';
 import '../../core/widgets/centered_popup.dart';
 import '../../core/date_formatters.dart';
 import '../../providers/settings_providers.dart';
@@ -23,20 +25,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   static final Uri _githubUri = Uri.parse(
     'https://github.com/atanhx/markdone',
   );
-  static const List<Color> _accentOptions = [
-    Color(0xFFFF6B35),
-    Color(0xFFE53935),
-    Color(0xFFD81B60),
-    Color(0xFF8E24AA),
-    Color(0xFF5E35B1),
-    Color(0xFF3949AB),
-    Color(0xFF1E88E5),
-    Color(0xFF00897B),
-    Color(0xFF43A047),
-    Color(0xFFFDD835),
-    Color(0xFFFB8C00),
-    Color(0xFF6D4C41),
-  ];
+
 
   bool _permissionsChecked = false;
   Map<Permission, PermissionStatus> _permissionStatuses = {};
@@ -299,6 +288,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
           _DateFormatTile(),
 
+          _AppIconTile(),
+
           if (showPermissionsSection) ...[
             const Divider(height: 32, indent: 16, endIndent: 16),
 
@@ -419,66 +410,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Future<void> _pickAccentColor(BuildContext context) async {
     final currentColor = ref.read(accentColorProvider);
-    final selectedColor = await showCenteredPopup<Color>(
-      context: context,
-      builder: (ctx) {
-        final theme = Theme.of(ctx);
-        return CenteredPopupContent(
-          scrollable: false,
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Accent Color', style: theme.textTheme.headlineSmall),
-              const SizedBox(height: 8),
-              Text(
-                'Choose the color used across the app.',
-                style: theme.textTheme.bodySmall,
-              ),
-              const SizedBox(height: 20),
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: [
-                  for (final color in _accentOptions)
-                    InkWell(
-                      borderRadius: BorderRadius.circular(999),
-                      onTap: () => Navigator.pop(ctx, color),
-                      child: Container(
-                        width: 42,
-                        height: 42,
-                        decoration: BoxDecoration(
-                          color: color,
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: currentColor.toARGB32() == color.toARGB32()
-                                ? theme.colorScheme.onSurface
-                                : Colors.transparent,
-                            width: 2.5,
-                          ),
-                        ),
-                        child: currentColor.toARGB32() == color.toARGB32()
-                            ? const Icon(
-                                Icons.check_rounded,
-                                color: Colors.white,
-                              )
-                            : null,
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              TextButton.icon(
-                onPressed: () => Navigator.pop(ctx, _accentOptions.first),
-                icon: const Icon(Icons.refresh_rounded),
-                label: const Text('Reset to default'),
-              ),
-            ],
-          ),
-        );
-      },
-    );
+    final selectedColor = await showAccentColorPicker(context, currentColor);
 
     if (selectedColor == null) return;
     ref.read(accentColorProvider.notifier).setColor(selectedColor);
@@ -730,91 +662,75 @@ class _SettingsTile extends StatelessWidget {
 class _FontScaleTile extends ConsumerWidget {
   const _FontScaleTile();
 
-  static const double _min = 0.8;
-  static const double _max = 1.4;
-
-  String _label(double scale) {
-    if (scale <= 0.85) return 'Small';
-    if (scale <= 0.95) return 'Compact';
-    if (scale <= 1.05) return 'Default';
-    if (scale <= 1.15) return 'Large';
-    if (scale <= 1.25) return 'Larger';
-    return 'Largest';
-  }
+  static const _sizes = [
+    (value: 0.80, label: 'XS'),
+    (value: 0.90, label: 'S'),
+    (value: 1.00, label: 'M'),
+    (value: 1.10, label: 'L'),
+    (value: 1.20, label: 'XL'),
+    (value: 1.30, label: 'XXL'),
+    (value: 1.40, label: 'XXXL'),
+  ];
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
     final scale = ref.watch(fontScaleProvider);
+    final currentLabel = _sizes.firstWhere(
+      (s) => (s.value - scale).abs() < 0.01,
+      orElse: () => _sizes[2],
+    ).label;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.format_size_rounded, color: theme.colorScheme.primary),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Font Size', style: theme.textTheme.titleMedium),
-                    Text(_label(scale), style: theme.textTheme.bodySmall),
-                  ],
-                ),
-              ),
-              if ((scale - 1.0).abs() > 0.01)
-                TextButton(
-                  onPressed: () =>
-                      ref.read(fontScaleProvider.notifier).setScale(1.0),
-                  style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  child: Text(
-                    'Reset',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: theme.colorScheme.primary,
-                    ),
-                  ),
-                ),
-            ],
+    return _SettingsTile(
+      icon: Icons.format_size_rounded,
+      title: 'Font Size',
+      subtitle: currentLabel,
+      trailing: PopupMenuButton<double>(
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(),
+        icon: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: Theme.of(context).dividerTheme.color ?? Colors.transparent,
+            ),
           ),
-          Row(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'A',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
+                currentLabel,
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600),
               ),
-              Expanded(
-                child: Slider(
-                  value: scale,
-                  min: _min,
-                  max: _max,
-                  divisions: 6,
-                  onChanged: (v) =>
-                      ref.read(fontScaleProvider.notifier).setScale(v),
-                ),
-              ),
-              Text(
-                'A',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w600,
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
+              const SizedBox(width: 2),
+              Icon(Icons.unfold_more_rounded, size: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
             ],
           ),
-        ],
+        ),
+        itemBuilder: (_) => _sizes.map((s) {
+          final isSelected = (s.value - scale).abs() < 0.01;
+          return PopupMenuItem<double>(
+            value: s.value,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  s.label,
+                  style: TextStyle(
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                    color: isSelected ? Theme.of(context).colorScheme.primary : null,
+                  ),
+                ),
+                if (isSelected) ...[
+                  const SizedBox(width: 6),
+                  Icon(Icons.check_rounded, size: 16, color: Theme.of(context).colorScheme.primary),
+                ],
+              ],
+            ),
+          );
+        }).toList(),
+        onSelected: (v) => ref.read(fontScaleProvider.notifier).setScale(v),
       ),
     );
   }
@@ -901,6 +817,119 @@ class _DateFormatTile extends ConsumerWidget {
           ref.read(dateFormatStyleProvider.notifier).setStyle(selected);
         }
       },
+    );
+  }
+}
+
+class _AppIconTile extends ConsumerStatefulWidget {
+  const _AppIconTile();
+
+  @override
+  ConsumerState<_AppIconTile> createState() => _AppIconTileState();
+}
+
+class _AppIconTileState extends ConsumerState<_AppIconTile> {
+  String _currentIcon = 'default';
+  bool _loaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadIcon();
+  }
+
+  Future<void> _loadIcon() async {
+    final icon = await AppIconService.getCurrentIcon();
+    if (mounted) {
+      setState(() {
+        _currentIcon = icon;
+        _loaded = true;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return _SettingsTile(
+      icon: Icons.app_settings_alt_outlined,
+      title: 'App Icon',
+      subtitle: _loaded
+          ? AppIconService.icons.firstWhere(
+              (i) => i.$1 == _currentIcon,
+              orElse: () => AppIconService.icons.first,
+            ).$2
+          : 'Loading…',
+      trailing: _loaded
+          ? PopupMenuButton<String>(
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+              icon: _IconPreview(iconKey: _currentIcon),
+              itemBuilder: (_) => AppIconService.icons.map((entry) {
+                final (key, label) = entry;
+                final isSelected = key == _currentIcon;
+                return PopupMenuItem<String>(
+                  value: key,
+                  child: Row(
+                    children: [
+                      _IconPreview(iconKey: key, size: 24),
+                      const SizedBox(width: 10),
+                      Text(
+                        label,
+                        style: TextStyle(
+                          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                          color: isSelected ? theme.colorScheme.primary : null,
+                        ),
+                      ),
+                      if (isSelected) ...[
+                        const SizedBox(width: 6),
+                        Icon(Icons.check_rounded, size: 16, color: theme.colorScheme.primary),
+                      ],
+                    ],
+                  ),
+                );
+              }).toList(),
+              onSelected: (key) async {
+                if (key == _currentIcon) return;
+                await AppIconService.setIcon(key);
+                if (mounted) {
+                  setState(() => _currentIcon = key);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('App icon changed to ${AppIconService.icons.firstWhere((i) => i.$1 == key).$2}')),
+                  );
+                }
+              },
+            )
+          : null,
+    );
+  }
+}
+
+/// A small colored preview of the app icon.
+class _IconPreview extends StatelessWidget {
+  final String iconKey;
+  final double size;
+
+  const _IconPreview({required this.iconKey, this.size = 28});
+
+  static const _colors = {
+    'default': Color(0xFF1b305b),
+    'red': Color(0xFFCC2936),
+    'yellow': Color(0xFFF4B400),
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _colors[iconKey] ?? _colors['default']!;
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(size * 0.22),
+      ),
+      child: Icon(Icons.done_rounded, color: Colors.white, size: size * 0.55),
     );
   }
 }

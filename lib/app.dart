@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/date_formatters.dart';
 import 'core/theme/app_theme.dart';
 import 'providers/theme_provider.dart';
-import 'screens/home/home_screen.dart';
+import 'screens/main_shell.dart';
 
 class MarkDoneApp extends ConsumerWidget {
   const MarkDoneApp({super.key});
@@ -33,7 +33,7 @@ class MarkDoneApp extends ConsumerWidget {
           child: child!,
         );
       },
-      home: const HomeScreen(),
+      home: const MainShell(),
     );
   }
 }

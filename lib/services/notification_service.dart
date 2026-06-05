@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:timezone/timezone.dart' as tz;
 import '../core/timezone_utils.dart';
 import '../models/sub_todo.dart';
@@ -9,16 +10,40 @@ import 'recurrence_service.dart';
 /// Background notification action handler — must be a top-level function so
 /// it can run in a separate isolate when the app is not in the foreground.
 ///
-/// When the user taps "Done!" while the app is backgrounded/killed, this writes
-/// a pending-completion entry to a queue file.  The next time the app opens,
-/// [ProjectsNotifier] reads that queue and applies the toggles.
+/// For todo notifications (actionId == "done"): writes a pending-completion
+/// entry to a queue file that sits alongside the project .md files.
+/// For habit notifications (payload starts with "habit|||"): writes the
+/// habit id to a habit-queue file so the habit notifier can apply the toggle
+/// on the next app launch.
 @pragma('vm:entry-point')
 Future<void> handleBackgroundNotificationResponse(
   NotificationResponse response,
 ) async {
-  if (response.actionId != NotificationService.doneActionId) return;
   final payload = response.payload;
   if (payload == null) return;
+
+  // ── Habit notification ──────────────────────────────────────────────────
+  if (payload.startsWith('habit|||')) {
+    if (response.actionId != 'habit_done') return;
+    final parts = payload.split('|||');
+    if (parts.length < 2) return;
+    final habitId = parts[1];
+
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      final queueFile = File('${dir.path}/.habit_queue');
+      await queueFile.writeAsString(
+        '$habitId\n',
+        mode: FileMode.append,
+      );
+    } catch (_) {
+      // Best-effort I/O
+    }
+    return;
+  }
+
+  // ── Todo notification ───────────────────────────────────────────────────
+  if (response.actionId != NotificationService.doneActionId) return;
 
   final sep = payload.indexOf('|||');
   if (sep < 0) return;
@@ -43,6 +68,7 @@ Future<void> handleBackgroundNotificationResponse(
 class NotificationService {
   static const String _remindersChannelId = 'markdone_reminders';
   static const String _instantChannelId = 'markdone_instant';
+  static const String _habitChannelId = 'markdone_habit_reminders';
 
   /// Action ID sent with every notification's "Done!" button.
   static const String doneActionId = 'done';
@@ -108,6 +134,15 @@ class NotificationService {
             _instantChannelId,
             'Instant Notifications',
             description: 'Immediate test notifications',
+            importance: Importance.high,
+          ),
+        );
+
+        await androidPlugin.createNotificationChannel(
+          const AndroidNotificationChannel(
+            _habitChannelId,
+            'Habit Reminders',
+            description: 'Daily reminders for habits',
             importance: Importance.high,
           ),
         );
@@ -357,6 +392,90 @@ class NotificationService {
         await cancelSubTodoNotifications(todo);
       }
     }
+  }
+
+  /// Schedules a daily habit reminder notification.
+  Future<void> scheduleHabitReminder({
+    required String habitId,
+    required String habitName,
+    required int hour,
+    required int minute,
+    String notificationMessage = 'Did you complete this habit today?',
+  }) async {
+    await _ensureInitialized();
+
+    final now = tz.TZDateTime.now(tz.local);
+    var scheduledDate = tz.TZDateTime(
+      tz.local,
+      now.year,
+      now.month,
+      now.day,
+      hour,
+      minute,
+    );
+    if (scheduledDate.isBefore(now)) {
+      scheduledDate = scheduledDate.add(const Duration(days: 1));
+    }
+
+    final id = (habitId.hashCode.abs() + 2000000) % 2147483647;
+    final payload = 'habit|||$habitId';
+
+    const details = NotificationDetails(
+      android: AndroidNotificationDetails(
+        _habitChannelId,
+        'Habit Reminders',
+        channelDescription: 'Daily reminders for habits',
+        importance: Importance.high,
+        priority: Priority.high,
+        actions: [
+          AndroidNotificationAction(
+            'habit_done',
+            'Done',
+            cancelNotification: true,
+          ),
+          AndroidNotificationAction(
+            'habit_not_done',
+            'Not Done',
+            cancelNotification: true,
+          ),
+        ],
+      ),
+    );
+
+    try {
+      await _plugin.zonedSchedule(
+        id,
+        habitName,
+        notificationMessage,
+        scheduledDate,
+        details,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        matchDateTimeComponents: DateTimeComponents.time,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        payload: payload,
+      );
+    } catch (_) {
+      await _plugin.zonedSchedule(
+        id,
+        habitName,
+        notificationMessage,
+        scheduledDate,
+        details,
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        matchDateTimeComponents: DateTimeComponents.time,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        payload: payload,
+      );
+    }
+  }
+
+  /// Cancels the daily reminder for a habit.
+  Future<void> cancelHabitReminder(String habitId) async {
+    await _ensureInitialized();
+    final id = (habitId.hashCode.abs() + 2000000) % 2147483647;
+    await _plugin.cancel(id);
   }
 
   /// Cancels all pending notifications.

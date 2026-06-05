@@ -9,6 +9,7 @@ import '../../models/master_project.dart';
 import '../../models/sub_todo.dart';
 import '../../providers/project_providers.dart';
 import '../../providers/settings_providers.dart';
+import '../projects/project_form_screen.dart';
 import 'widgets/sub_todo_tile.dart';
 
 class ProjectDetailScreen extends ConsumerStatefulWidget {
@@ -214,6 +215,39 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                 child: Text(
                   project.description!,
                   style: theme.textTheme.bodyMedium,
+                ),
+              ),
+            ),
+
+          // Empty state
+          if (project.todos.isEmpty)
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(40),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.edit_note_rounded,
+                        size: 56,
+                        color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.25),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'What\'s on your mind?',
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Add a task to get started.',
+                        style: theme.textTheme.bodyMedium,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -646,7 +680,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                   children: [
                     if (isEditing) ...[
                       Expanded(
-                        child: OutlinedButton.icon(
+                        child: OutlinedButton(
                           onPressed: () async {
                             final shouldDelete = await showDialog<bool>(
                               context: ctx,
@@ -686,8 +720,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                               Navigator.pop(ctx);
                             }
                           },
-                          icon: const Icon(Icons.delete_outline_rounded),
-                          label: const Text('Delete'),
+                          child: const Text('Delete'),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -794,326 +827,10 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     final project = ref.read(projectByPathProvider(widget.filePath));
     if (project == null) return;
 
-    final titleController = TextEditingController(text: project.title);
-    final descController = TextEditingController(
-      text: project.description ?? '',
-    );
-    DateTime? dday = project.dday;
-    bool syncWithCalendar = project.syncWithCalendar;
-    Color? bgColor = parseBgColor(project.bgColor);
-
-    // Check if calendar sync is globally enabled
-    final calSyncEnabled = ref.read(calendarSyncEnabledProvider);
-
-    showCenteredPopup(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheetState) {
-          final theme = Theme.of(ctx);
-          return CenteredPopupContent(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text('Edit Project', style: theme.textTheme.headlineSmall),
-                const SizedBox(height: 14),
-                // Title field
-                TextField(
-                  controller: titleController,
-                  decoration: InputDecoration(
-                    hintText: 'Project name',
-                    prefixIcon: const Icon(Icons.folder_outlined),
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 12,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                // Description field (compact)
-                TextField(
-                  controller: descController,
-                  decoration: InputDecoration(
-                    hintText: 'Description',
-                    prefixIcon: const Icon(Icons.notes_rounded),
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 10,
-                    ),
-                  ),
-                  maxLines: 2,
-                  minLines: 1,
-                ),
-                const SizedBox(height: 10),
-                // Settings container (compact bordered box)
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHighest.withValues(
-                      alpha: 0.35,
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: theme.dividerTheme.color ?? Colors.transparent,
-                    ),
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // D-Day row
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 2),
-                        child: Row(
-                          children: [
-                            Icon(
-                              dday != null
-                                  ? Icons.event_rounded
-                                  : Icons.event_outlined,
-                              size: 17,
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: GestureDetector(
-                                onTap: () async {
-                                  final picked = await showDatePicker(
-                                    context: ctx,
-                                    initialDate:
-                                        dday ??
-                                        DateTime.now().add(
-                                          const Duration(days: 30),
-                                        ),
-                                    firstDate: DateTime.now().subtract(
-                                      const Duration(days: 365),
-                                    ),
-                                    lastDate: DateTime.now().add(
-                                      const Duration(days: 3650),
-                                    ),
-                                  );
-                                  if (picked != null) {
-                                    setSheetState(() => dday = picked);
-                                  }
-                                },
-                                child: Text(
-                                  dday != null
-                                      ? 'D-Day: ${MarkdoneDateFormatter.formatDate(dday!)}'
-                                      : 'Set D-Day',
-                                  style: theme.textTheme.labelLarge?.copyWith(
-                                    fontSize: 13,
-                                    color: dday != null
-                                        ? theme.colorScheme.onSurface
-                                        : theme.colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            SizedBox(
-                              width: 22,
-                              height: 22,
-                              child: Checkbox(
-                                value: dday != null,
-                                onChanged: (checked) async {
-                                  if (checked == true) {
-                                    final picked = await showDatePicker(
-                                      context: ctx,
-                                      initialDate: DateTime.now().add(
-                                        const Duration(days: 30),
-                                      ),
-                                      firstDate: DateTime.now().subtract(
-                                        const Duration(days: 365),
-                                      ),
-                                      lastDate: DateTime.now().add(
-                                        const Duration(days: 3650),
-                                      ),
-                                    );
-                                    if (picked != null) {
-                                      setSheetState(() => dday = picked);
-                                    }
-                                  } else {
-                                    setSheetState(() => dday = null);
-                                  }
-                                },
-                                materialTapTargetSize:
-                                    MaterialTapTargetSize.shrinkWrap,
-                                visualDensity: VisualDensity.compact,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (calSyncEnabled) ...[
-                        Divider(
-                          height: 12,
-                          thickness: 1,
-                          color: theme.dividerTheme.color ?? Colors.transparent,
-                        ),
-                        // Calendar sync row
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 2),
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.calendar_month_outlined,
-                                size: 17,
-                                color: theme.colorScheme.onSurfaceVariant,
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                'Sync with calendar',
-                                style: theme.textTheme.labelLarge?.copyWith(
-                                  fontSize: 13,
-                                  color: syncWithCalendar
-                                      ? theme.colorScheme.onSurface
-                                      : theme.colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                              const Spacer(),
-                              SizedBox(
-                                width: 22,
-                                height: 22,
-                                child: Checkbox(
-                                  value: syncWithCalendar,
-                                  onChanged: (v) => setSheetState(
-                                    () => syncWithCalendar = v ?? false,
-                                  ),
-                                  materialTapTargetSize:
-                                      MaterialTapTargetSize.shrinkWrap,
-                                  visualDensity: VisualDensity.compact,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                      Divider(
-                        height: 12,
-                        thickness: 1,
-                        color: theme.dividerTheme.color ?? Colors.transparent,
-                      ),
-                      // Background color row
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 2),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.palette_outlined,
-                              size: 17,
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: GestureDetector(
-                                onTap: () async {
-                                  final picked = await showBgColorPicker(
-                                    ctx,
-                                    bgColor,
-                                  );
-                                  if (picked != null) {
-                                    setSheetState(() => bgColor = picked);
-                                  }
-                                },
-                                child: Text(
-                                  bgColor != null
-                                      ? 'Background color'
-                                      : 'Set background color',
-                                  style: theme.textTheme.labelLarge?.copyWith(
-                                    fontSize: 13,
-                                    color: bgColor != null
-                                        ? theme.colorScheme.onSurface
-                                        : theme.colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            if (bgColor != null) ...[
-                              GestureDetector(
-                                onTap: () async {
-                                  final picked = await showBgColorPicker(
-                                    ctx,
-                                    bgColor,
-                                  );
-                                  if (picked != null) {
-                                    setSheetState(() => bgColor = picked);
-                                  }
-                                },
-                                child: Container(
-                                  width: 22,
-                                  height: 22,
-                                  decoration: BoxDecoration(
-                                    color: bgColor,
-                                    borderRadius: BorderRadius.circular(6),
-                                    border: Border.all(
-                                      color: theme.colorScheme.onSurfaceVariant
-                                          .withValues(alpha: 0.3),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                            ],
-                            SizedBox(
-                              width: 22,
-                              height: 22,
-                              child: Checkbox(
-                                value: bgColor != null,
-                                onChanged: (checked) async {
-                                  if (checked == true) {
-                                    final picked = await showBgColorPicker(
-                                      ctx,
-                                      null,
-                                    );
-                                    if (picked != null) {
-                                      setSheetState(() => bgColor = picked);
-                                    }
-                                  } else {
-                                    setSheetState(() => bgColor = null);
-                                  }
-                                },
-                                materialTapTargetSize:
-                                    MaterialTapTargetSize.shrinkWrap,
-                                visualDensity: VisualDensity.compact,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 14),
-                FilledButton(
-                  onPressed: () {
-                    final title = titleController.text.trim();
-                    if (title.isEmpty) return;
-
-                    final updated = project.copyWith(
-                      title: title,
-                      description: descController.text.trim().isNotEmpty
-                          ? descController.text.trim()
-                          : null,
-                      clearDescription: descController.text.trim().isEmpty,
-                      dday: dday,
-                      clearDday: dday == null,
-                      syncWithCalendar: syncWithCalendar,
-                      bgColor: bgColor != null
-                          ? colorToHexString(bgColor!)
-                          : null,
-                      clearBgColor: bgColor == null,
-                    );
-
-                    ref
-                        .read(projectsProvider.notifier)
-                        .updateProjectMetadata(updated);
-                    Navigator.pop(ctx);
-                  },
-                  child: const Text('Save'),
-                ),
-              ],
-            ),
-          );
-        },
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ProjectFormScreen(project: project),
       ),
     );
   }
