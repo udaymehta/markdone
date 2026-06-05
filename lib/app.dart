@@ -16,7 +16,6 @@ class MarkDoneApp extends ConsumerWidget {
     final amoled = ref.watch(amoledDarkProvider);
     final dateStyle = ref.watch(dateFormatStyleProvider);
 
-    // Apply date format globally so stateless widgets pick it up.
     MarkdoneDateFormatter.style = dateStyle;
 
     return MaterialApp(

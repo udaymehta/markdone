@@ -55,7 +55,7 @@
             android:name=".MainActivity_red"
             android:enabled="false"
             android:exported="true"
-            android:icon="@mipmap/ic_launcher_red"
+            android:icon="@mipmap/ic_launcher"
             android:label="MarkDone!"
             android:targetActivity=".MainActivity">
             <intent-filter>
@@ -69,7 +69,7 @@
             android:name=".MainActivity_yellow"
             android:enabled="false"
             android:exported="true"
-            android:icon="@mipmap/ic_launcher_yellow"
+            android:icon="@mipmap/ic_launcher"
             android:label="MarkDone!"
             android:targetActivity=".MainActivity">
             <intent-filter>

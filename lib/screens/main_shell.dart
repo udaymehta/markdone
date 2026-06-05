@@ -33,6 +33,8 @@ class _MainShellState extends State<MainShell> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final brightness = Theme.of(context).brightness;
     return Scaffold(
       body: PageView(
         controller: _pageController,
@@ -46,7 +48,19 @@ class _MainShellState extends State<MainShell> {
         mainAxisSize: MainAxisSize.min,
         children: [
           const Divider(height: 0.5, thickness: 0.5),
-          NavigationBar(
+          NavigationBarTheme(
+            data: NavigationBarThemeData(
+              indicatorColor: colors.primary,
+              iconTheme: WidgetStateProperty.resolveWith((states) {
+                if (states.contains(WidgetState.selected)) {
+                  return IconThemeData(
+                    color: brightness == Brightness.light ? Colors.white : Colors.black,
+                  );
+                }
+                return null;
+              }),
+            ),
+            child: NavigationBar(
             selectedIndex: _currentIndex,
             onDestinationSelected: _onNavTap,
             destinations: const [
@@ -61,6 +75,7 @@ class _MainShellState extends State<MainShell> {
                 label: 'Habits',
               ),
             ],
+          ),
           ),
         ],
       ),

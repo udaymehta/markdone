@@ -25,6 +25,7 @@ class _ProjectFormScreenState extends ConsumerState<ProjectFormScreen> {
   late final TextEditingController _descCtrl;
   late final TextEditingController _ddayCtrl;
   late final TextEditingController _bgColorCtrl;
+  late final TextEditingController _syncCtrl;
   late DateTime? _dday;
   late Color? _bgColor;
   late bool _syncWithCalendar;
@@ -69,6 +70,9 @@ class _ProjectFormScreenState extends ConsumerState<ProjectFormScreen> {
     _bgColorCtrl = TextEditingController(
       text: _bgColor != null ? 'Set' : 'Not set',
     );
+    _syncCtrl = TextEditingController(
+      text: _syncWithCalendar ? 'Enabled' : 'Disabled',
+    );
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -85,6 +89,7 @@ class _ProjectFormScreenState extends ConsumerState<ProjectFormScreen> {
     _descCtrl.dispose();
     _ddayCtrl.dispose();
     _bgColorCtrl.dispose();
+    _syncCtrl.dispose();
     super.dispose();
   }
 
@@ -197,14 +202,21 @@ class _ProjectFormScreenState extends ConsumerState<ProjectFormScreen> {
           ),
           const SizedBox(height: 16),
           if (_calSyncEnabled) ...[
-            CheckboxListTile(
-              title: const Text('Sync with calendar'),
-              value: _syncWithCalendar,
-              onChanged: (v) =>
-                  setState(() => _syncWithCalendar = v ?? false),
-              dense: true,
-              controlAffinity: ListTileControlAffinity.trailing,
-              contentPadding: EdgeInsets.zero,
+            TextFormField(
+              controller: _syncCtrl,
+              readOnly: true,
+              decoration: _decoration(
+                labelText: 'Sync with calendar',
+                prefixIcon: const Icon(Icons.sync_rounded),
+                suffixIcon: const Icon(Icons.arrow_drop_down_rounded),
+                colors: colors,
+              ),
+              onTap: () {
+                setState(() {
+                  _syncWithCalendar = !_syncWithCalendar;
+                  _syncCtrl.text = _syncWithCalendar ? 'Enabled' : 'Disabled';
+                });
+              },
             ),
             const SizedBox(height: 16),
           ],

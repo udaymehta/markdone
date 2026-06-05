@@ -361,12 +361,11 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           else
             SliverReorderableList(
               itemCount: pendingTodos.length,
-              onReorder: (oldIndex, newIndex) {
+              onReorderItem: (oldIndex, newIndex) {
                 // Optimistic local update to prevent flicker
-                final adjusted = newIndex > oldIndex ? newIndex - 1 : newIndex;
                 final reordered = List<SubTodo>.from(pendingTodos);
                 final item = reordered.removeAt(oldIndex);
-                reordered.insert(adjusted, item);
+                reordered.insert(newIndex, item);
                 setState(() => _localPendingTodos = reordered);
 
                 // Fire async persist, then clear local override

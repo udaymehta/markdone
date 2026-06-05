@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/habit.dart';
@@ -301,7 +300,28 @@ class _TrendChart extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final breakdown = habit.weeklyBreakdown;
-    if (breakdown.isEmpty) {
+
+    // Build contiguous last 6 weeks (including current), fill missing with 0
+    final now = DateTime.now();
+    final currentMonday = now.subtract(Duration(days: now.weekday - 1));
+
+    final data = <MapEntry<String, int>>[];
+    var maxVal = 1;
+    for (var i = 5; i >= 0; i--) {
+      final weekDate = currentMonday.subtract(Duration(days: i * 7));
+      final jan4 = DateTime(weekDate.year, 1, 4);
+      final firstWeek =
+          jan4.subtract(Duration(days: jan4.weekday - 1));
+      final weekNum =
+          ((weekDate.difference(firstWeek).inDays) / 7).floor() + 1;
+      final key =
+          '${weekDate.year}-W${weekNum.toString().padLeft(2, '0')}';
+      final value = breakdown[key] ?? 0;
+      if (value > maxVal) maxVal = value;
+      data.add(MapEntry(key, value));
+    }
+
+    if (data.every((e) => e.value == 0)) {
       return Container(
         padding: const EdgeInsets.symmetric(vertical: 24),
         alignment: Alignment.center,
@@ -314,13 +334,6 @@ class _TrendChart extends StatelessWidget {
       );
     }
 
-    final sorted = breakdown.entries.toList()
-      ..sort((a, b) => a.key.compareTo(b.key));
-    final maxVal = math.max(
-      1,
-      sorted.map((e) => e.value).reduce((a, b) => a > b ? a : b),
-    );
-
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -332,7 +345,7 @@ class _TrendChart extends StatelessWidget {
         child: CustomPaint(
           size: Size.infinite,
           painter: _LineChartPainter(
-            data: sorted,
+            data: data,
             maxVal: maxVal,
             color: color,
             isDark: theme.brightness == Brightness.dark,

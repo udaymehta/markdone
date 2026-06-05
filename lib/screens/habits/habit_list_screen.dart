@@ -170,7 +170,7 @@ class _HabitListViewState extends ConsumerState<_HabitListView> {
           child: ReorderableListView.builder(
             padding: const EdgeInsets.only(bottom: 88),
             itemCount: widget.habits.length,
-            onReorder: (oldIndex, newIndex) {
+            onReorderItem: (oldIndex, newIndex) {
               ref
                   .read(habitListProvider.notifier)
                   .reorderHabits(oldIndex, newIndex);
@@ -179,6 +179,8 @@ class _HabitListViewState extends ConsumerState<_HabitListView> {
               final habit = widget.habits[index];
               final streak = habit.currentStreak;
               final color = _parseColor(habit.color);
+              final goal = habit.goal;
+              final fill = goal > 0 ? (streak / goal).clamp(0.0, 1.0) : 1.0;
 
               return Material(
                 key: ValueKey(habit.id),
@@ -204,61 +206,52 @@ class _HabitListViewState extends ConsumerState<_HabitListView> {
                             height: 42,
                             child: Row(
                               children: [
-                                Container(
+                                SizedBox(
                                   width: 4,
-                                  height: 36,
-                                  decoration: BoxDecoration(
-                                    color: color,
-                                    borderRadius: BorderRadius.circular(2),
+                                  height: 42,
+                                  child: CustomPaint(
+                                    painter: _ProgressBarPainter(
+                                      color: color,
+                                      fill: fill,
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(width: 10),
                                 Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.center,
+                                  child: Row(
+                                    crossAxisAlignment: CrossAxisAlignment.center,
                                     children: [
-                                      Text(
-                                        habit.name,
-                                        style: theme.textTheme.bodyLarge
-                                            ?.copyWith(
-                                              fontWeight: FontWeight.w500,
-                                            ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
+                                      Flexible(
+                                        child: Text(
+                                          habit.name,
+                                          style: theme.textTheme.bodyLarge
+                                              ?.copyWith(
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
                                       ),
-                                      SizedBox(
-                                        height: 14,
-                                        child: streak > 1
-                                            ? Row(
-                                                mainAxisSize:
-                                                    MainAxisSize.min,
-                                                children: [
-                                                  Icon(
-                                                    Icons
-                                                        .local_fire_department,
-                                                    size: 12,
-                                                    color: color.withValues(
-                                                        alpha: 0.6),
-                                                  ),
-                                                  const SizedBox(width: 2),
-                                                  Text(
-                                                    '$streak',
-                                                    style: theme
-                                                        .textTheme.labelSmall
-                                                        ?.copyWith(
-                                                      color: color.withValues(
-                                                          alpha: 0.6),
-                                                      fontWeight:
-                                                          FontWeight.w600,
-                                                    ),
-                                                  ),
-                                                ],
-                                              )
-                                            : null,
-                                      ),
+                                      if (streak > 1) ...[
+                                        const SizedBox(width: 6),
+                                        Icon(
+                                          Icons.local_fire_department,
+                                          size: 14,
+                                          color: color.withValues(alpha: 0.7),
+                                        ),
+                                        const SizedBox(width: 2),
+                                        Text(
+                                          '$streak',
+                                          style: theme
+                                              .textTheme.labelSmall
+                                              ?.copyWith(
+                                            color: color.withValues(
+                                                alpha: 0.7),
+                                            fontWeight:
+                                                FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
                                     ],
                                   ),
                                 ),
@@ -284,4 +277,43 @@ Color _parseColor(String hex) {
   hex = hex.replaceAll('#', '');
   if (hex.length == 6) hex = 'FF$hex';
   return Color(int.parse(hex, radix: 16));
+}
+
+class _ProgressBarPainter extends CustomPainter {
+  final Color color;
+  final double fill;
+
+  _ProgressBarPainter({required this.color, required this.fill});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final bgPaint = Paint()
+      ..color = color.withAlpha(25)
+      ..style = PaintingStyle.fill;
+
+    final fillPaint = Paint()
+      ..color = color.withAlpha(200)
+      ..style = PaintingStyle.fill;
+
+    final r = 2.5;
+
+    final bgRRect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(0, 0, size.width, size.height),
+      Radius.circular(r),
+    );
+    canvas.drawRRect(bgRRect, bgPaint);
+
+    if (fill > 0) {
+      final fillHeight = size.height * fill;
+      final fillRRect = RRect.fromRectAndRadius(
+        Rect.fromLTWH(0, size.height - fillHeight, size.width, fillHeight),
+        Radius.circular(r),
+      );
+      canvas.drawRRect(fillRRect, fillPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_ProgressBarPainter oldDelegate) =>
+      oldDelegate.color != color || oldDelegate.fill != fill;
 }

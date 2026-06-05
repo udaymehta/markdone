@@ -75,6 +75,7 @@ class HabitListNotifier extends AsyncNotifier<List<Habit>> {
     int reminderHour = 0,
     int reminderMinute = 0,
     String notificationMessage = 'Did you complete this habit today?',
+    int goal = 0,
   }) async {
     final service = ref.read(habitServiceProvider);
     final habit = await service.addHabit(
@@ -84,6 +85,7 @@ class HabitListNotifier extends AsyncNotifier<List<Habit>> {
       reminderHour: reminderHour,
       reminderMinute: reminderMinute,
       notificationMessage: notificationMessage,
+      goal: goal,
     );
     state = AsyncData([...state.value ?? [], habit]);
 
@@ -135,8 +137,7 @@ class HabitListNotifier extends AsyncNotifier<List<Habit>> {
     if (current == null) return;
     final habits = [...current];
     final item = habits.removeAt(oldIndex);
-    final adjustedNewIndex = newIndex > oldIndex ? newIndex - 1 : newIndex;
-    habits.insert(adjustedNewIndex, item);
+    habits.insert(newIndex, item);
     state = AsyncData(habits);
     await service.saveHabits(habits);
   }

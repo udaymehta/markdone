@@ -6,7 +6,6 @@ import 'package:file_picker/file_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/color_utils.dart';
-import '../../services/app_icon_service.dart';
 import '../../core/widgets/centered_popup.dart';
 import '../../core/date_formatters.dart';
 import '../../providers/settings_providers.dart';
@@ -100,9 +99,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       error: (_, _) => '$effectiveStoragePathText/archive',
     );
     final showPermissionsSection =
+        _permissionsChecked &&
         permissionEntries.isNotEmpty &&
-        (!_permissionsChecked ||
-            !_allRelevantPermissionsGranted(permissionEntries));
+        !_allRelevantPermissionsGranted(permissionEntries);
 
     return Scaffold(
       appBar: AppBar(
@@ -174,8 +173,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
           const Divider(height: 32, indent: 16, endIndent: 16),
 
-          // ── Tasks ──
-          _SectionHeader(title: 'Tasks'),
+          // ── Project (Tasks + Calendar) ──
+          _SectionHeader(title: 'Project'),
           _SettingsTile(
             icon: Icons.visibility_off_outlined,
             title: 'Hide Completed Tasks',
@@ -192,11 +191,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 .read(hideCompletedProvider.notifier)
                 .setHideCompleted(!hideCompleted),
           ),
-
-          const Divider(height: 32, indent: 16, endIndent: 16),
-
-          // ── Calendar ──
-          _SectionHeader(title: 'Calendar'),
           _SettingsTile(
             icon: Icons.sync_rounded,
             title: 'Enable Calendar Sync',
@@ -288,20 +282,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
           _DateFormatTile(),
 
-          _AppIconTile(),
-
           if (showPermissionsSection) ...[
             const Divider(height: 32, indent: 16, endIndent: 16),
 
             // ── Permissions ──
             _SectionHeader(title: 'Permissions'),
-            if (_permissionsChecked)
-              ..._buildPermissionTiles(permissionEntries)
-            else
-              const Padding(
-                padding: EdgeInsets.all(16),
-                child: Center(child: CircularProgressIndicator()),
-              ),
+            ..._buildPermissionTiles(permissionEntries),
           ],
 
           const Divider(height: 32, indent: 16, endIndent: 16),
@@ -817,119 +803,6 @@ class _DateFormatTile extends ConsumerWidget {
           ref.read(dateFormatStyleProvider.notifier).setStyle(selected);
         }
       },
-    );
-  }
-}
-
-class _AppIconTile extends ConsumerStatefulWidget {
-  const _AppIconTile();
-
-  @override
-  ConsumerState<_AppIconTile> createState() => _AppIconTileState();
-}
-
-class _AppIconTileState extends ConsumerState<_AppIconTile> {
-  String _currentIcon = 'default';
-  bool _loaded = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadIcon();
-  }
-
-  Future<void> _loadIcon() async {
-    final icon = await AppIconService.getCurrentIcon();
-    if (mounted) {
-      setState(() {
-        _currentIcon = icon;
-        _loaded = true;
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return _SettingsTile(
-      icon: Icons.app_settings_alt_outlined,
-      title: 'App Icon',
-      subtitle: _loaded
-          ? AppIconService.icons.firstWhere(
-              (i) => i.$1 == _currentIcon,
-              orElse: () => AppIconService.icons.first,
-            ).$2
-          : 'Loading…',
-      trailing: _loaded
-          ? PopupMenuButton<String>(
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
-              icon: _IconPreview(iconKey: _currentIcon),
-              itemBuilder: (_) => AppIconService.icons.map((entry) {
-                final (key, label) = entry;
-                final isSelected = key == _currentIcon;
-                return PopupMenuItem<String>(
-                  value: key,
-                  child: Row(
-                    children: [
-                      _IconPreview(iconKey: key, size: 24),
-                      const SizedBox(width: 10),
-                      Text(
-                        label,
-                        style: TextStyle(
-                          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                          color: isSelected ? theme.colorScheme.primary : null,
-                        ),
-                      ),
-                      if (isSelected) ...[
-                        const SizedBox(width: 6),
-                        Icon(Icons.check_rounded, size: 16, color: theme.colorScheme.primary),
-                      ],
-                    ],
-                  ),
-                );
-              }).toList(),
-              onSelected: (key) async {
-                if (key == _currentIcon) return;
-                await AppIconService.setIcon(key);
-                if (mounted) {
-                  setState(() => _currentIcon = key);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('App icon changed to ${AppIconService.icons.firstWhere((i) => i.$1 == key).$2}')),
-                  );
-                }
-              },
-            )
-          : null,
-    );
-  }
-}
-
-/// A small colored preview of the app icon.
-class _IconPreview extends StatelessWidget {
-  final String iconKey;
-  final double size;
-
-  const _IconPreview({required this.iconKey, this.size = 28});
-
-  static const _colors = {
-    'default': Color(0xFF1b305b),
-    'red': Color(0xFFCC2936),
-    'yellow': Color(0xFFF4B400),
-  };
-
-  @override
-  Widget build(BuildContext context) {
-    final color = _colors[iconKey] ?? _colors['default']!;
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(size * 0.22),
-      ),
-      child: Icon(Icons.done_rounded, color: Colors.white, size: size * 0.55),
     );
   }
 }

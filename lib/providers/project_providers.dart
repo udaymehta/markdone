@@ -676,13 +676,10 @@ class ProjectsNotifier extends AsyncNotifier<List<MasterProject>> {
     final completed = project.todos.where((t) => t.isCompleted).toList();
 
     if (oldIndex < 0 || oldIndex >= pending.length) return;
-    if (newIndex < 0 || newIndex > pending.length) return;
-
-    // Flutter's ReorderableList uses newIndex after removal semantics
-    final adjusted = newIndex > oldIndex ? newIndex - 1 : newIndex;
+    if (newIndex < 0 || newIndex >= pending.length) return;
 
     final item = pending.removeAt(oldIndex);
-    pending.insert(adjusted, item);
+    pending.insert(newIndex, item);
 
     // Stamp sortOrder so custom order survives a reload
     final reorderedPending = <SubTodo>[];

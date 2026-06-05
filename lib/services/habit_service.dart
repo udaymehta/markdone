@@ -50,7 +50,7 @@ class HabitService {
     final file = await _file;
     // Ensure parent directory exists
     await file.parent.create(recursive: true);
-    final buffer = StringBuffer('id|name|created_at|color|completed_dates|reminder_enabled|reminder_hour|reminder_minute|notification_message|sort_order\n');
+    final buffer = StringBuffer('id|name|created_at|color|completed_dates|reminder_enabled|reminder_hour|reminder_minute|notification_message|sort_order|goal\n');
     for (final h in habits) {
       buffer.writeln(h.toCsvRow());
     }
@@ -64,6 +64,7 @@ class HabitService {
     int reminderHour = 0,
     int reminderMinute = 0,
     String notificationMessage = 'Did you complete this habit today?',
+    int goal = 0,
   }) async {
     final habits = await loadHabits();
     final maxOrder = habits.isEmpty ? 0 : habits.map((h) => h.sortOrder).reduce((a, b) => a > b ? a : b);
@@ -77,6 +78,7 @@ class HabitService {
       reminderMinute: reminderMinute,
       notificationMessage: notificationMessage,
       sortOrder: maxOrder + 1,
+      goal: goal,
     );
     habits.add(habit);
     await saveHabits(habits);

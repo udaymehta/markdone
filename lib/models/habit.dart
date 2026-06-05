@@ -10,7 +10,8 @@ class Habit {
   final int reminderMinute;
   final String notificationMessage;
   final int sortOrder;
-  final SplayTreeSet<DateTime> _completedDates; // sorted, normalized to UTC midnight
+  final int goal;
+  final SplayTreeSet<DateTime> _completedDates;
 
   Habit({
     required this.id,
@@ -22,6 +23,7 @@ class Habit {
     this.reminderMinute = 0,
     this.notificationMessage = 'Did you complete this habit today?',
     this.sortOrder = 0,
+    this.goal = 0,
     Iterable<DateTime>? completedDates,
   }) : _completedDates = SplayTreeSet<DateTime>((a, b) => a.compareTo(b))
     ..addAll((completedDates ?? []).map(_normalizeDate));
@@ -56,6 +58,7 @@ class Habit {
       reminderMinute: reminderMinute,
       notificationMessage: notificationMessage,
       sortOrder: sortOrder,
+      goal: goal,
       completedDates: updated,
     );
   }
@@ -70,6 +73,7 @@ class Habit {
     int? reminderMinute,
     String? notificationMessage,
     int? sortOrder,
+    int? goal,
     Iterable<DateTime>? completedDates,
     bool clearCompleted = false,
   }) {
@@ -83,6 +87,7 @@ class Habit {
       reminderMinute: reminderMinute ?? this.reminderMinute,
       notificationMessage: notificationMessage ?? this.notificationMessage,
       sortOrder: sortOrder ?? this.sortOrder,
+      goal: goal ?? this.goal,
       completedDates: clearCompleted ? [] : (completedDates ?? _completedDates),
     );
   }
@@ -181,7 +186,7 @@ class Habit {
             );
     final escapedName = name.replaceAll('|', '\\p');
     final escapedMsg = notificationMessage.replaceAll('|', '\\p');
-    return '$id|$escapedName|${createdAt.toIso8601String().split('T').first}|$color|$datesStr|${reminderEnabled ? 1 : 0}|$reminderHour|$reminderMinute|$escapedMsg|$sortOrder';
+    return '$id|$escapedName|${createdAt.toIso8601String().split('T').first}|$color|$datesStr|${reminderEnabled ? 1 : 0}|$reminderHour|$reminderMinute|$escapedMsg|$sortOrder|$goal';
   }
 
   static Habit? fromCsvRow(String line) {
@@ -202,6 +207,7 @@ class Habit {
           ? parts[8].replaceAll('\\p', '|')
           : 'Did you complete this habit today?';
       final sortOrder = parts.length > 9 ? int.tryParse(parts[9]) ?? 0 : 0;
+      final goal = parts.length > 10 ? int.tryParse(parts[10]) ?? 0 : 0;
       return Habit(
         id: parts[0],
         name: parts[1].replaceAll('\\p', '|'),
@@ -213,6 +219,7 @@ class Habit {
         reminderMinute: reminderMinute,
         notificationMessage: notifMsg,
         sortOrder: sortOrder,
+        goal: goal,
       );
     } catch (_) {
       return null;

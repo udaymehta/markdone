@@ -17,6 +17,7 @@ class _HabitFormScreenState extends ConsumerState<HabitFormScreen> {
   late final TextEditingController _nameCtrl;
   late final TextEditingController _notifCtrl;
   late final TextEditingController _reminderCtrl;
+  late final TextEditingController _goalCtrl;
   late Color _color;
   late bool _reminderSet;
   late int _reminderHour;
@@ -56,7 +57,7 @@ class _HabitFormScreenState extends ConsumerState<HabitFormScreen> {
     _notifCtrl = TextEditingController(
       text: h?.notificationMessage ?? 'Did you complete this habit today?',
     );
-    _color = h != null ? _parseColor(h.color) : const Color(0xFF1b305b);
+    _color = h != null ? _parseColor(h.color) : const Color(0xFF1e88e5);
     _reminderSet = h?.reminderEnabled ?? false;
     _reminderHour = h?.reminderHour ?? 9;
     _reminderMinute = h?.reminderMinute ?? 0;
@@ -65,6 +66,10 @@ class _HabitFormScreenState extends ConsumerState<HabitFormScreen> {
           ? '${_reminderHour.toString().padLeft(2, '0')}:${_reminderMinute.toString().padLeft(2, '0')}'
           : 'Off',
     );
+    _goalCtrl = TextEditingController(
+      text: h?.goal != null && h!.goal > 0 ? h.goal.toString() : '',
+    );
+    _goalCtrl.addListener(() => setState(() {}));
   }
 
   @override
@@ -72,12 +77,15 @@ class _HabitFormScreenState extends ConsumerState<HabitFormScreen> {
     _nameCtrl.dispose();
     _notifCtrl.dispose();
     _reminderCtrl.dispose();
+    _goalCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _save() async {
     final name = _nameCtrl.text.trim();
     if (name.isEmpty) return;
+
+    final goalVal = int.tryParse(_goalCtrl.text.trim()) ?? 0;
 
     if (_isEditing) {
       final updated = widget.habit!.copyWith(
@@ -89,6 +97,7 @@ class _HabitFormScreenState extends ConsumerState<HabitFormScreen> {
         notificationMessage: _notifCtrl.text.trim().isNotEmpty
             ? _notifCtrl.text.trim()
             : 'Did you complete this habit today?',
+        goal: goalVal,
       );
       await ref.read(habitListProvider.notifier).updateHabit(updated);
     } else {
@@ -101,6 +110,7 @@ class _HabitFormScreenState extends ConsumerState<HabitFormScreen> {
         notificationMessage: _notifCtrl.text.trim().isNotEmpty
             ? _notifCtrl.text.trim()
             : 'Did you complete this habit today?',
+        goal: goalVal,
       );
     }
 
@@ -219,6 +229,16 @@ class _HabitFormScreenState extends ConsumerState<HabitFormScreen> {
                   : theme.colorScheme.onSurface.withValues(alpha: 0.3),
               fontWeight:
                   _reminderSet ? FontWeight.w600 : FontWeight.w400,
+            ),
+          ),
+          const SizedBox(height: 16),
+          TextFormField(
+            controller: _goalCtrl,
+            keyboardType: TextInputType.number,
+            decoration: _decoration(
+              labelText: 'Goal (optional)',
+              hintText: 'e.g. 7',
+              colors: colors,
             ),
           ),
         ],

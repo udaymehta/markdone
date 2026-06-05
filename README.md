@@ -176,4 +176,4 @@ By default, files are stored in a local `markdone` folder. You can change this t
 
 ## Disclaimer
 
-A good portion of the code in this project was written with AI assistance. This started as a personal tool for my own workflow. Sharing it in case it's useful to someone else.
+A good portion (almost all?) of the code in this project was written with AI assistance. This started as a personal tool for my own workflow. Sharing it in case it's useful to someone else.

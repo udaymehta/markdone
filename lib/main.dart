@@ -16,9 +16,6 @@ Future<void> requestStartupPermissions() async {
 
   // Request exact alarm permission (needed for scheduled notifications)
   await Permission.scheduleExactAlarm.request();
-
-  // Request calendar access (needed for calendar sync feature)
-  await Permission.calendarFullAccess.request();
 }
 
 Future<void> main() async {
@@ -26,6 +23,15 @@ Future<void> main() async {
 
   // Pre-initialize SharedPreferences once – makes all settings reads instant.
   final prefs = await SharedPreferences.getInstance();
+
+  // Track app version to reset stale prefs (e.g. from Android Auto Backup)
+  const currentVersion = '1.4.0';
+  final lastVersion = prefs.getString('markdone_version');
+  if (lastVersion != currentVersion) {
+    await prefs.setString('markdone_version', currentVersion);
+    // Reset calendar sync on version change so it always starts OFF
+    await prefs.setBool('markdone_calendar_sync', false);
+  }
 
   final notifService = NotificationService();
   await notifService.init();

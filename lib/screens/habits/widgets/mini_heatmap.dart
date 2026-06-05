@@ -10,7 +10,8 @@ Color _parseColor(String hex) {
   return Color(int.parse(hex, radix: 16));
 }
 
-/// Shows 4 toggleable day-cells (today + 3 previous) styled as checkboxes.
+bool _isLightColor(Color c) => c.computeLuminance() > 0.5;
+
 class MiniHeatmap extends ConsumerWidget {
   final Habit habit;
 
@@ -20,6 +21,7 @@ class MiniHeatmap extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final color = _parseColor(habit.color);
+    final checkColor = _isLightColor(color) ? Colors.black : Colors.white;
 
     final today = DateTime.utc(
       DateTime.now().year,
@@ -65,7 +67,7 @@ class MiniHeatmap extends ConsumerWidget {
               child: AnimatedOpacity(
                 duration: const Duration(milliseconds: 200),
                 opacity: isDone ? 1.0 : 0.0,
-                child: const Icon(Icons.check_rounded, color: Colors.white, size: 16),
+                child: Icon(Icons.check_rounded, color: checkColor, size: 16),
               ),
             ),
           ),
