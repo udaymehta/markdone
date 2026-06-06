@@ -36,7 +36,6 @@ Future<void> main() async {
   final notifService = NotificationService();
   await notifService.init();
 
-  // Request necessary permissions on startup
   await requestStartupPermissions();
 
   runApp(

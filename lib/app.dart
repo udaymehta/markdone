@@ -14,9 +14,10 @@ class MarkDoneApp extends ConsumerWidget {
     final accentColor = ref.watch(accentColorProvider);
     final fontScale = ref.watch(fontScaleProvider);
     final amoled = ref.watch(amoledDarkProvider);
-    final dateStyle = ref.watch(dateFormatStyleProvider);
 
-    MarkdoneDateFormatter.style = dateStyle;
+    ref.listen(dateFormatStyleProvider, (_, next) {
+      MarkdoneDateFormatter.style = next;
+    });
 
     return MaterialApp(
       title: 'MarkDone!',
