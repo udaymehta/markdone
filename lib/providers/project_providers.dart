@@ -10,11 +10,9 @@ import '../services/calendar_service.dart';
 import '../services/recurrence_service.dart';
 import 'settings_providers.dart';
 
-// --- Service providers ---
-
 final fileServiceProvider = Provider<FileService>((ref) {
   final fileService = FileService();
-  // Wire custom path from settings into file service (now synchronous)
+  // Wire custom path from settings into file service
   final storagePath = ref.watch(storagePathProvider);
   fileService.customBasePath = storagePath;
   return fileService;
@@ -50,9 +48,6 @@ class BackgroundProjectSyncNotifier extends Notifier<bool> {
   void setSyncing(bool value) => state = value;
 }
 
-// --- Projects state ---
-
-/// Holds the list of all loaded projects.
 final projectsProvider =
     AsyncNotifierProvider<ProjectsNotifier, List<MasterProject>>(
       ProjectsNotifier.new,
@@ -95,7 +90,6 @@ class ProjectsNotifier extends AsyncNotifier<List<MasterProject>> {
     // doesn't trigger an immediate spurious reload)
     _startWatching();
 
-    // Cancel watching when provider is disposed
     ref.onDispose(() {
       _watchSub?.cancel();
       _archiveWatchSub?.cancel();
@@ -104,39 +98,42 @@ class ProjectsNotifier extends AsyncNotifier<List<MasterProject>> {
     return advancedProjects;
   }
 
-  /// Fire-and-forget notification scheduling so it never blocks build/reload.
+  // Fire-and-forget notification scheduling so it never blocks build/reload.
   void _scheduleAllNotificationsInBackground(List<MasterProject> projects) {
     Future(() async {
-      final notifService = ref.read(notificationServiceProvider);
-      await notifService.init();
+      try {
+        final notifService = ref.read(notificationServiceProvider);
+        await notifService.init();
 
-      final previousProjects = _scheduledProjectsByPath;
-      final nextProjects = <String, MasterProject>{
-        for (final project in projects) project.filePath: project,
-      };
+        final previousProjects = _scheduledProjectsByPath;
+        final nextProjects = <String, MasterProject>{
+          for (final project in projects) project.filePath: project,
+        };
 
-      final removedProjects = previousProjects.keys.toSet().difference(
-        nextProjects.keys.toSet(),
-      );
-      for (final filePath in removedProjects) {
-        final removedProject = previousProjects[filePath];
-        if (removedProject == null) continue;
-        for (final todo in removedProject.todos) {
-          await notifService.cancelSubTodoNotifications(todo);
+        final removedProjects = previousProjects.keys.toSet().difference(
+          nextProjects.keys.toSet(),
+        );
+        for (final filePath in removedProjects) {
+          final removedProject = previousProjects[filePath];
+          if (removedProject == null) continue;
+          for (final todo in removedProject.todos) {
+            await notifService.cancelSubTodoNotifications(todo);
+          }
         }
-      }
 
-      for (final project in projects) {
-        if (previousProjects[project.filePath] != project) {
-          await notifService.rescheduleProjectNotifications(project);
+        for (final project in projects) {
+          if (previousProjects[project.filePath] != project) {
+            await notifService.rescheduleProjectNotifications(project);
+          }
         }
-      }
 
-      _scheduledProjectsByPath = nextProjects;
+        _scheduledProjectsByPath = nextProjects;
+      } catch (e) {
+        debugPrint('[ProjectsNotifier] background notification error: $e');
+      }
     });
   }
 
-  /// Pulls latest changes from file storage and calendar.
   Future<List<MasterProject>> _syncProjectsFromSources(
     List<MasterProject> projects,
   ) async {
@@ -168,7 +165,7 @@ class ProjectsNotifier extends AsyncNotifier<List<MasterProject>> {
     }
   }
 
-  /// Runs calendar sync after initial file load so startup stays responsive.
+  // Runs calendar sync after initial file load so startup stays responsive.
   void _syncCalendarInBackground(List<MasterProject> projects) {
     if (_calendarSyncInProgress) return;
 
@@ -229,8 +226,6 @@ class ProjectsNotifier extends AsyncNotifier<List<MasterProject>> {
     });
   }
 
-  /// Syncs a sub-todo to the device calendar if sync is enabled.
-  /// Returns the updated todo with calendarEventId set.
   Future<SubTodo> _syncTodoToCalendar({
     required SubTodo todo,
     required MasterProject project,
@@ -263,7 +258,6 @@ class ProjectsNotifier extends AsyncNotifier<List<MasterProject>> {
     return todo;
   }
 
-  /// Removes a sub-todo's calendar event if it exists.
   Future<void> _removeTodoFromCalendar(SubTodo todo) async {
     if (todo.calendarEventId == null) return;
     final calendarId = ref.read(selectedCalendarIdProvider);
@@ -340,9 +334,8 @@ class ProjectsNotifier extends AsyncNotifier<List<MasterProject>> {
     return updatedProject;
   }
 
-  /// Reads the pending-completion queue file that the background notification
-  /// handler writes to when the user taps "Done!" while the app is closed.
-  /// Applies each queued toggle to [projects] and returns the updated list.
+  // Reads the pending-completion queue file written by the background
+  // notification handler, applying each queued toggle to [projects].
   Future<List<MasterProject>> _applyNotificationCompletionQueue(
     List<MasterProject> projects,
   ) async {
@@ -375,8 +368,7 @@ class ProjectsNotifier extends AsyncNotifier<List<MasterProject>> {
     }
   }
 
-  /// Applies a single toggle (complete or recurring-advance) to [projects]
-  /// without touching Riverpod state — safe to call during [build].
+  // Applies a single toggle without touching Riverpod state — safe during build.
   Future<List<MasterProject>> _toggleTodoInProjects(
     List<MasterProject> projects,
     String filePath,
@@ -407,9 +399,6 @@ class ProjectsNotifier extends AsyncNotifier<List<MasterProject>> {
     return updatedProjects;
   }
 
-  /// Scans all projects on load and advances any recurring tasks whose alarm
-  /// has already passed, so the user sees up-to-date dates without having to
-  /// manually tap the checkbox.
   Future<List<MasterProject>> _autoAdvanceOverdueRecurringTodos(
     List<MasterProject> projects,
   ) async {
@@ -474,7 +463,6 @@ class ProjectsNotifier extends AsyncNotifier<List<MasterProject>> {
     );
   }
 
-  /// Reloads all projects from disk.
   Future<void> reload() async {
     state = const AsyncLoading();
     final fileService = ref.read(fileServiceProvider);
@@ -493,7 +481,6 @@ class ProjectsNotifier extends AsyncNotifier<List<MasterProject>> {
     }
   }
 
-  /// Forces a refresh from files and calendar sources.
   Future<void> syncEverything() async {
     state = const AsyncLoading();
     final fileService = ref.read(fileServiceProvider);
@@ -513,7 +500,6 @@ class ProjectsNotifier extends AsyncNotifier<List<MasterProject>> {
     }
   }
 
-  /// Creates a new project.
   Future<MasterProject> createProject({
     required String title,
     DateTime? dday,
@@ -535,7 +521,6 @@ class ProjectsNotifier extends AsyncNotifier<List<MasterProject>> {
     return project;
   }
 
-  /// Deletes a project.
   Future<void> deleteProject(String filePath) async {
     final fileService = ref.read(fileServiceProvider);
     final notifService = ref.read(notificationServiceProvider);
@@ -553,21 +538,18 @@ class ProjectsNotifier extends AsyncNotifier<List<MasterProject>> {
     await reload();
   }
 
-  /// Moves a project into the archive folder.
   Future<void> archiveProject(String filePath) async {
     final fileService = ref.read(fileServiceProvider);
     await fileService.archiveProject(filePath);
     await reload();
   }
 
-  /// Restores an archived project to the active projects folder.
   Future<void> restoreProject(String filePath) async {
     final fileService = ref.read(fileServiceProvider);
     await fileService.restoreProject(filePath);
     await reload();
   }
 
-  /// Toggles a sub-todo's completion state.
   Future<void> toggleTodo(String filePath, String todoId) async {
     final current = state.value ?? [];
     final projectIdx = current.indexWhere((p) => p.filePath == filePath);
@@ -596,7 +578,6 @@ class ProjectsNotifier extends AsyncNotifier<List<MasterProject>> {
     state = AsyncData(updatedProjects);
   }
 
-  /// Adds a new sub-todo to a project.
   Future<void> addTodo(String filePath, SubTodo todo) async {
     final current = state.value ?? [];
     final projectIdx = current.indexWhere((p) => p.filePath == filePath);
@@ -614,7 +595,6 @@ class ProjectsNotifier extends AsyncNotifier<List<MasterProject>> {
     state = AsyncData(updatedProjects);
   }
 
-  /// Updates a sub-todo within a project.
   Future<void> updateTodo(String filePath, SubTodo updatedTodo) async {
     final current = state.value ?? [];
     final projectIdx = current.indexWhere((p) => p.filePath == filePath);
@@ -636,7 +616,6 @@ class ProjectsNotifier extends AsyncNotifier<List<MasterProject>> {
     state = AsyncData(updatedProjects);
   }
 
-  /// Removes a sub-todo from a project.
   Future<void> removeTodo(String filePath, String todoId) async {
     final current = state.value ?? [];
     final projectIdx = current.indexWhere((p) => p.filePath == filePath);
@@ -647,7 +626,6 @@ class ProjectsNotifier extends AsyncNotifier<List<MasterProject>> {
 
     final notifService = ref.read(notificationServiceProvider);
     await notifService.cancelSubTodoNotifications(todo);
-    // Remove calendar event
     await _removeTodoFromCalendar(todo);
 
     final updatedTodos = project.todos.where((t) => t.id != todoId).toList();
@@ -661,9 +639,6 @@ class ProjectsNotifier extends AsyncNotifier<List<MasterProject>> {
     state = AsyncData(updatedProjects);
   }
 
-  /// Reorders a pending sub-todo within a project (drag-to-reorder).
-  /// [oldIndex] and [newIndex] are indices within the pending (non-completed)
-  /// todo list. Persists the new order via sortOrder metadata.
   Future<void> reorderTodo(String filePath, int oldIndex, int newIndex) async {
     final current = state.value ?? [];
     final projectIdx = current.indexWhere((p) => p.filePath == filePath);
@@ -698,7 +673,6 @@ class ProjectsNotifier extends AsyncNotifier<List<MasterProject>> {
     state = AsyncData(updatedProjects);
   }
 
-  /// Updates project metadata (title, dday, color etc.).
   Future<void> updateProjectMetadata(MasterProject updated) async {
     final fileService = ref.read(fileServiceProvider);
     await fileService.writeProject(updated);
@@ -706,9 +680,6 @@ class ProjectsNotifier extends AsyncNotifier<List<MasterProject>> {
   }
 }
 
-// --- Derived providers ---
-
-/// Provider for a single project by file path.
 final projectByPathProvider = Provider.family<MasterProject?, String>((
   ref,
   filePath,
@@ -723,7 +694,6 @@ final projectByPathProvider = Provider.family<MasterProject?, String>((
   ].where((p) => p.filePath == filePath).firstOrNull;
 });
 
-/// Provider for archived projects.
 final archivedProjectsProvider = FutureProvider<List<MasterProject>>((
   ref,
 ) async {
@@ -732,7 +702,6 @@ final archivedProjectsProvider = FutureProvider<List<MasterProject>>((
   return fileService.readAllProjects(archived: true);
 });
 
-/// Provider for active projects, keeping completed ones at the bottom.
 final sortedProjectsProvider = Provider<List<MasterProject>>((ref) {
   final projectsAsync = ref.watch(projectsProvider);
   final projects = projectsAsync.value ?? [];
@@ -782,7 +751,6 @@ int _compareDdayPriority(MasterProject a, MasterProject b) {
   return bDays.compareTo(aDays);
 }
 
-/// Provider for projects with D-Day events, sorted by nearest upcoming date first.
 final ddayProjectsProvider = Provider<List<MasterProject>>((ref) {
   final projects = ref.watch(sortedProjectsProvider);
 
@@ -798,7 +766,6 @@ final ddayProjectsProvider = Provider<List<MasterProject>>((ref) {
   return ddayProjects;
 });
 
-/// Provider for upcoming sub-todo alarms across all projects.
 final upcomingAlarmsProvider =
     Provider<List<({MasterProject project, SubTodo todo})>>((ref) {
       final projectsAsync = ref.watch(projectsProvider);

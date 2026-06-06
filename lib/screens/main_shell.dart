@@ -39,10 +39,7 @@ class _MainShellState extends State<MainShell> {
       body: PageView(
         controller: _pageController,
         onPageChanged: _onPageChanged,
-        children: const [
-          HomeScreen(),
-          HabitListScreen(),
-        ],
+        children: const [HomeScreen(), HabitListScreen()],
       ),
       bottomNavigationBar: Column(
         mainAxisSize: MainAxisSize.min,
@@ -54,28 +51,30 @@ class _MainShellState extends State<MainShell> {
               iconTheme: WidgetStateProperty.resolveWith((states) {
                 if (states.contains(WidgetState.selected)) {
                   return IconThemeData(
-                    color: brightness == Brightness.light ? Colors.white : Colors.black,
+                    color: brightness == Brightness.light
+                        ? Colors.white
+                        : Colors.black,
                   );
                 }
                 return null;
               }),
             ),
             child: NavigationBar(
-            selectedIndex: _currentIndex,
-            onDestinationSelected: _onNavTap,
-            destinations: const [
-              NavigationDestination(
-                icon: Icon(Icons.folder_outlined),
-                selectedIcon: Icon(Icons.folder),
-                label: 'Projects',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.grid_view_outlined),
-                selectedIcon: Icon(Icons.grid_view),
-                label: 'Habits',
-              ),
-            ],
-          ),
+              selectedIndex: _currentIndex,
+              onDestinationSelected: _onNavTap,
+              destinations: const [
+                NavigationDestination(
+                  icon: Icon(Icons.folder_outlined),
+                  selectedIcon: Icon(Icons.folder),
+                  label: 'Projects',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.grid_view_outlined),
+                  selectedIcon: Icon(Icons.grid_view),
+                  label: 'Habits',
+                ),
+              ],
+            ),
           ),
         ],
       ),

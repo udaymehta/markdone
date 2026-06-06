@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/settings_service.dart';
 
-/// Must be overridden in ProviderScope with a pre-initialized instance.
 final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
   throw UnimplementedError(
     'sharedPreferencesProvider must be overridden with a pre-initialized instance',
@@ -14,8 +13,6 @@ final settingsServiceProvider = Provider<SettingsService>((ref) {
   final prefs = ref.watch(sharedPreferencesProvider);
   return SettingsService(prefs);
 });
-
-// --- Storage Path Provider (synchronous) ---
 
 final storagePathProvider = NotifierProvider<StoragePathNotifier, String?>(
   StoragePathNotifier.new,
@@ -45,8 +42,6 @@ class StoragePathNotifier extends Notifier<String?> {
   }
 }
 
-// --- Selected Calendar Provider (synchronous) ---
-
 final selectedCalendarIdProvider =
     NotifierProvider<SelectedCalendarNotifier, String?>(
       SelectedCalendarNotifier.new,
@@ -65,8 +60,6 @@ class SelectedCalendarNotifier extends Notifier<String?> {
     state = id;
   }
 }
-
-// --- Selected Calendar Name Provider (synchronous) ---
 
 final selectedCalendarNameProvider =
     NotifierProvider<SelectedCalendarNameNotifier, String?>(
@@ -87,8 +80,6 @@ class SelectedCalendarNameNotifier extends Notifier<String?> {
   }
 }
 
-// --- Hide Completed Tasks Provider (synchronous) ---
-
 final hideCompletedProvider = NotifierProvider<HideCompletedNotifier, bool>(
   HideCompletedNotifier.new,
 );
@@ -106,8 +97,6 @@ class HideCompletedNotifier extends Notifier<bool> {
     state = value;
   }
 }
-
-// --- Calendar Sync Enabled Provider (synchronous) ---
 
 final calendarSyncEnabledProvider =
     NotifierProvider<CalendarSyncEnabledNotifier, bool>(

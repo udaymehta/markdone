@@ -4,8 +4,6 @@ import '../core/date_formatters.dart';
 import '../core/theme/app_theme.dart';
 import 'settings_providers.dart';
 
-// --- Theme Mode Provider ---
-
 final themeModeProvider = NotifierProvider<ThemeModeNotifier, ThemeMode>(
   ThemeModeNotifier.new,
 );
@@ -14,16 +12,8 @@ class ThemeModeNotifier extends Notifier<ThemeMode> {
   @override
   ThemeMode build() {
     final settings = ref.read(settingsServiceProvider);
-    switch (settings.getThemeMode()) {
-      case 'light':
-        return ThemeMode.light;
-      case 'dark':
-        return ThemeMode.dark;
-      case 'system':
-        return ThemeMode.system;
-      default:
-        return ThemeMode.dark;
-    }
+    return ThemeMode.values.asNameMap()[settings.getThemeMode()] ??
+        ThemeMode.dark;
   }
 
   void toggle() {
@@ -59,8 +49,6 @@ class AccentColorNotifier extends Notifier<Color> {
   void reset() => setColor(AppColors.accent);
 }
 
-// --- Font Scale Provider ---
-
 final fontScaleProvider = NotifierProvider<FontScaleNotifier, double>(
   FontScaleNotifier.new,
 );
@@ -81,8 +69,6 @@ class FontScaleNotifier extends Notifier<double> {
   void reset() => setScale(1.0);
 }
 
-// --- AMOLED Dark Mode Provider ---
-
 final amoledDarkProvider = NotifierProvider<AmoledDarkNotifier, bool>(
   AmoledDarkNotifier.new,
 );
@@ -102,8 +88,6 @@ class AmoledDarkNotifier extends Notifier<bool> {
 
   void toggle() => setEnabled(!state);
 }
-
-// --- Date Format Style Provider ---
 
 final dateFormatStyleProvider =
     NotifierProvider<DateFormatStyleNotifier, DateFormatStyle>(

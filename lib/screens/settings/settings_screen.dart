@@ -25,7 +25,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     'https://github.com/atanhx/markdone',
   );
 
-
   bool _permissionsChecked = false;
   Map<Permission, PermissionStatus> _permissionStatuses = {};
   @override
@@ -84,6 +83,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final hideCompleted = ref.watch(hideCompletedProvider);
     final calSyncEnabled = ref.watch(calendarSyncEnabledProvider);
     final accentColor = ref.watch(accentColorProvider);
+    final themeMode = ref.watch(themeModeProvider);
     final permissionEntries = _permissionEntries();
     final effectiveStoragePathText = effectiveStoragePathAsync.when(
       data: (path) => path,
@@ -110,7 +110,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.symmetric(vertical: 8),
         children: [
-          // ── Storage Folder ──
           _SectionHeader(title: 'Storage'),
           _SettingsTile(
             icon: Icons.folder_outlined,
@@ -173,7 +172,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
           const Divider(height: 32, indent: 16, endIndent: 16),
 
-          // ── Project (Tasks + Calendar) ──
           _SectionHeader(title: 'Project'),
           _SettingsTile(
             icon: Icons.visibility_off_outlined,
@@ -226,25 +224,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
           const Divider(height: 32, indent: 16, endIndent: 16),
 
-          // ── Appearance ──
           _SectionHeader(title: 'Appearance'),
           _SettingsTile(
-            icon: ref.watch(themeModeProvider) == ThemeMode.dark
+            icon: themeMode == ThemeMode.dark
                 ? Icons.dark_mode_rounded
                 : Icons.light_mode_rounded,
             title: 'Theme',
-            subtitle: ref.watch(themeModeProvider) == ThemeMode.dark
-                ? 'Dark Mode'
-                : 'Light Mode',
+            subtitle: themeMode == ThemeMode.dark ? 'Dark Mode' : 'Light Mode',
             trailing: Switch(
-              value: ref.watch(themeModeProvider) == ThemeMode.dark,
+              value: themeMode == ThemeMode.dark,
               onChanged: (_) => ref.read(themeModeProvider.notifier).toggle(),
               activeTrackColor: theme.colorScheme.primary,
             ),
             onTap: () => ref.read(themeModeProvider.notifier).toggle(),
           ),
 
-          if (ref.watch(themeModeProvider) == ThemeMode.dark)
+          if (themeMode == ThemeMode.dark)
             _SettingsTile(
               icon: Icons.contrast_rounded,
               title: 'AMOLED Dark',
@@ -285,14 +280,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           if (showPermissionsSection) ...[
             const Divider(height: 32, indent: 16, endIndent: 16),
 
-            // ── Permissions ──
             _SectionHeader(title: 'Permissions'),
             ..._buildPermissionTiles(permissionEntries),
           ],
 
           const Divider(height: 32, indent: 16, endIndent: 16),
 
-          // ── About ──
           _SectionHeader(title: 'About'),
           _SettingsTile(
             icon: Icons.link_rounded,
@@ -403,7 +396,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Future<void> _pickFolder(BuildContext context) async {
-    // Ensure storage permission first
     if (Platform.isAndroid) {
       final status = await Permission.manageExternalStorage.request();
       if (!status.isGranted) {
@@ -426,7 +418,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     if (result != null) {
       await ref.read(storagePathProvider.notifier).setPath(result);
-      // Reload projects from the new folder
       ref.invalidate(projectsProvider);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -527,7 +518,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Future<void> _runFullSync(BuildContext context) async {
-    // Show a loading snackbar
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -587,8 +577,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 }
-
-// ── Reusable Widgets ──
 
 class _SectionHeader extends StatelessWidget {
   final String title;
@@ -661,10 +649,12 @@ class _FontScaleTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final scale = ref.watch(fontScaleProvider);
-    final currentLabel = _sizes.firstWhere(
-      (s) => (s.value - scale).abs() < 0.01,
-      orElse: () => _sizes[2],
-    ).label;
+    final currentLabel = _sizes
+        .firstWhere(
+          (s) => (s.value - scale).abs() < 0.01,
+          orElse: () => _sizes[2],
+        )
+        .label;
 
     return _SettingsTile(
       icon: Icons.format_size_rounded,
@@ -676,7 +666,9 @@ class _FontScaleTile extends ConsumerWidget {
         icon: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+            color: Theme.of(
+              context,
+            ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
               color: Theme.of(context).dividerTheme.color ?? Colors.transparent,
@@ -687,10 +679,16 @@ class _FontScaleTile extends ConsumerWidget {
             children: [
               Text(
                 currentLabel,
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600),
+                style: Theme.of(
+                  context,
+                ).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600),
               ),
               const SizedBox(width: 2),
-              Icon(Icons.unfold_more_rounded, size: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
+              Icon(
+                Icons.unfold_more_rounded,
+                size: 14,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ],
           ),
         ),
@@ -705,12 +703,18 @@ class _FontScaleTile extends ConsumerWidget {
                   s.label,
                   style: TextStyle(
                     fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                    color: isSelected ? Theme.of(context).colorScheme.primary : null,
+                    color: isSelected
+                        ? Theme.of(context).colorScheme.primary
+                        : null,
                   ),
                 ),
                 if (isSelected) ...[
                   const SizedBox(width: 6),
-                  Icon(Icons.check_rounded, size: 16, color: Theme.of(context).colorScheme.primary),
+                  Icon(
+                    Icons.check_rounded,
+                    size: 16,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
                 ],
               ],
             ),
@@ -735,12 +739,7 @@ class _DateFormatTile extends ConsumerWidget {
 
   static String _example(DateFormatStyle s) {
     final sample = DateTime(2026, 3, 16, 9, 0);
-    // Temporarily set style to generate preview, then restore.
-    final prev = MarkdoneDateFormatter.style;
-    MarkdoneDateFormatter.style = s;
-    final result = MarkdoneDateFormatter.formatDate(sample);
-    MarkdoneDateFormatter.style = prev;
-    return result;
+    return MarkdoneDateFormatter.formatDate(sample, s);
   }
 
   @override

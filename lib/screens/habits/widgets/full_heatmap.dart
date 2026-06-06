@@ -26,24 +26,26 @@ class _FullHeatmapState extends ConsumerState<FullHeatmap> {
   @override
   void initState() {
     super.initState();
-    _currentMonth = DateTime.utc(
-      DateTime.now().year,
-      DateTime.now().month,
-      1,
-    );
+    _currentMonth = DateTime.utc(DateTime.now().year, DateTime.now().month, 1);
   }
 
   void _prevMonth() {
     setState(() {
-      _currentMonth =
-          DateTime.utc(_currentMonth.year, _currentMonth.month - 1, 1);
+      _currentMonth = DateTime.utc(
+        _currentMonth.year,
+        _currentMonth.month - 1,
+        1,
+      );
     });
   }
 
   void _nextMonth() {
     setState(() {
-      _currentMonth =
-          DateTime.utc(_currentMonth.year, _currentMonth.month + 1, 1);
+      _currentMonth = DateTime.utc(
+        _currentMonth.year,
+        _currentMonth.month + 1,
+        1,
+      );
     });
   }
 
@@ -69,10 +71,16 @@ class _FullHeatmapState extends ConsumerState<FullHeatmap> {
       DateTime.now().day,
     );
 
-    final daysInMonth =
-        DateTime(_currentMonth.year, _currentMonth.month + 1, 0).day;
-    final firstWeekday = DateTime(_currentMonth.year, _currentMonth.month, 1)
-        .weekday; // 1=Mon ... 7=Sun
+    final daysInMonth = DateTime(
+      _currentMonth.year,
+      _currentMonth.month + 1,
+      0,
+    ).day;
+    final firstWeekday = DateTime(
+      _currentMonth.year,
+      _currentMonth.month,
+      1,
+    ).weekday; // 1=Mon ... 7=Sun
     final padBefore = firstWeekday - 1;
     final totalCells = padBefore + daysInMonth;
     final rows = (totalCells / 7).ceil();
@@ -80,7 +88,6 @@ class _FullHeatmapState extends ConsumerState<FullHeatmap> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // Month navigation
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           child: Row(
@@ -103,7 +110,6 @@ class _FullHeatmapState extends ConsumerState<FullHeatmap> {
             ],
           ),
         ),
-        // Day labels
         Row(
           mainAxisSize: MainAxisSize.min,
           children: _dayAbbr
@@ -113,8 +119,7 @@ class _FullHeatmapState extends ConsumerState<FullHeatmap> {
                   child: Text(
                     l,
                     style: theme.textTheme.labelSmall?.copyWith(
-                      color: theme.colorScheme.onSurface
-                          .withValues(alpha: 0.5),
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
                       fontSize: 10,
                     ),
                     textAlign: TextAlign.center,
@@ -139,22 +144,26 @@ class _FullHeatmapState extends ConsumerState<FullHeatmap> {
                         _currentMonth.year,
                         _currentMonth.month + (day < 1 ? -1 : 1),
                         day < 1
-                            ? DateTime(_currentMonth.year,
-                                        _currentMonth.month, 0)
-                                    .day +
-                                day
+                            ? DateTime(
+                                    _currentMonth.year,
+                                    _currentMonth.month,
+                                    0,
+                                  ).day +
+                                  day
                             : day - daysInMonth,
                       )
                     : null;
                 final date = isPadding
                     ? otherMonth
                     : DateTime.utc(
-                        _currentMonth.year, _currentMonth.month, day);
+                        _currentMonth.year,
+                        _currentMonth.month,
+                        day,
+                      );
                 final isToday = !isPadding && date == today;
                 final isFuture = date != null && date.isAfter(today);
-                final isDone = date != null &&
-                    !isPadding &&
-                    liveHabit.isCompletedOn(date);
+                final isDone =
+                    date != null && !isPadding && liveHabit.isCompletedOn(date);
 
                 return GestureDetector(
                   onTap: (date != null && !isFuture && !isPadding)
@@ -172,10 +181,10 @@ class _FullHeatmapState extends ConsumerState<FullHeatmap> {
                       color: isPadding
                           ? Colors.transparent
                           : (isDone
-                              ? color.withValues(alpha: 0.7)
-                              : (isDark
-                                  ? Colors.white.withValues(alpha: 0.06)
-                                  : Colors.grey.withValues(alpha: 0.1))),
+                                ? color.withValues(alpha: 0.7)
+                                : (isDark
+                                      ? Colors.white.withValues(alpha: 0.06)
+                                      : Colors.grey.withValues(alpha: 0.1))),
                       borderRadius: BorderRadius.circular(6),
                       border: isToday && !isDone
                           ? Border.all(
@@ -189,17 +198,18 @@ class _FullHeatmapState extends ConsumerState<FullHeatmap> {
                         isPadding ? '${date?.day ?? ''}' : '$day',
                         style: TextStyle(
                           fontSize: isPadding ? 10 : 11,
-                          fontWeight:
-                              isToday ? FontWeight.bold : FontWeight.normal,
+                          fontWeight: isToday
+                              ? FontWeight.bold
+                              : FontWeight.normal,
                           color: isPadding
                               ? (isDark
-                                  ? Colors.white.withValues(alpha: 0.15)
-                                  : Colors.grey.withValues(alpha: 0.3))
+                                    ? Colors.white.withValues(alpha: 0.15)
+                                    : Colors.grey.withValues(alpha: 0.3))
                               : (isDone
-                                  ? Colors.white
-                                  : (isDark
-                                      ? Colors.white.withValues(alpha: 0.6)
-                                      : Colors.black87)),
+                                    ? Colors.white
+                                    : (isDark
+                                          ? Colors.white.withValues(alpha: 0.6)
+                                          : Colors.black87)),
                         ),
                       ),
                     ),
@@ -215,8 +225,18 @@ class _FullHeatmapState extends ConsumerState<FullHeatmap> {
 
   String _monthYearString(DateTime dt) {
     const months = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December',
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
     ];
     return '${months[dt.month - 1]} ${dt.year}';
   }

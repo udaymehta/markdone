@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-/// A beautiful custom animated checkbox with a check mark animation.
 class AnimatedCheckbox extends StatefulWidget {
   final bool value;
   final ValueChanged<bool> onChanged;
@@ -138,7 +137,6 @@ class _AnimatedCheckboxState extends State<AnimatedCheckbox>
   }
 }
 
-/// Draws an animated check mark.
 class _CheckPainter extends CustomPainter {
   final double progress;
   final Color color;

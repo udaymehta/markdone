@@ -130,17 +130,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ),
         data: (_) {
           if (projects.isEmpty) {
-            return _EmptyState(
-              isSyncing: isBackgroundSyncing,
-            );
+            return _EmptyState(isSyncing: isBackgroundSyncing);
           }
 
+          final hideCompleted = ref.watch(hideCompletedProvider);
           return RefreshIndicator(
             onRefresh: () =>
                 ref.read(projectsProvider.notifier).syncEverything(),
             child: CustomScrollView(
               slivers: [
-                // Section header
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
@@ -169,11 +167,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ),
                 ),
 
-                // Project cards
                 SliverList(
                   delegate: SliverChildBuilderDelegate((context, index) {
                     final project = projects[index];
-                    final hideCompleted = ref.watch(hideCompletedProvider);
                     return ProjectCard(
                       project: project,
                       hideCompleted: hideCompleted,
@@ -258,7 +254,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  void _confirmDelete(BuildContext context, project) {
+  void _confirmDelete(BuildContext context, MasterProject project) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -297,7 +293,7 @@ class _EmptyState extends StatelessWidget {
     final theme = Theme.of(context);
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(40),
+        padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [

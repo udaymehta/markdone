@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import '../../../core/app_dimensions.dart';
 import '../../../core/date_formatters.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../models/sub_todo.dart';
 import 'animated_checkbox.dart';
 
-/// A single sub-todo tile with animated checkbox and metadata display.
 class SubTodoTile extends StatelessWidget {
   final SubTodo todo;
   final VoidCallback onToggle;
@@ -11,8 +12,6 @@ class SubTodoTile extends StatelessWidget {
   final VoidCallback? onDismissed;
   final DateTime? projectDday;
 
-  /// Optional drag handle widget placed at the trailing edge.
-  /// Pass a [ReorderableDragStartListener] wrapping an icon here.
   final Widget? dragHandle;
 
   const SubTodoTile({
@@ -26,14 +25,16 @@ class SubTodoTile extends StatelessWidget {
   });
 
   Widget _buildMetadata(BuildContext context, {bool overdue = false}) {
+    final theme = Theme.of(context);
     final baseColor = todo.isCompleted
-        ? Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.55)
+        ? theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.55)
         : overdue
-            ? Theme.of(context).colorScheme.error.withValues(alpha: 0.6)
-            : Theme.of(context).colorScheme.onSurfaceVariant;
-    final baseStyle = Theme.of(
-      context,
-    ).textTheme.bodySmall?.copyWith(color: baseColor, height: 1.35);
+        ? theme.colorScheme.error.withValues(alpha: 0.6)
+        : theme.colorScheme.onSurfaceVariant;
+    final baseStyle = theme.textTheme.bodySmall?.copyWith(
+      color: baseColor,
+      height: 1.35,
+    );
 
     final dateText = MarkdoneDateFormatter.formatDateTime(todo.alarm!);
     final extras = <String>[];
@@ -67,7 +68,9 @@ class SubTodoTile extends StatelessWidget {
   }
 
   bool get _isOverdue =>
-      !todo.isCompleted && todo.alarm != null && todo.alarm!.isBefore(DateTime.now());
+      !todo.isCompleted &&
+      todo.alarm != null &&
+      todo.alarm!.isBefore(DateTime.now());
 
   @override
   Widget build(BuildContext context) {
@@ -77,22 +80,22 @@ class SubTodoTile extends StatelessWidget {
     return Dismissible(
       key: ValueKey(todo.id),
       direction: DismissDirection.horizontal,
-      // Right swipe (start → end): complete/uncomplete
+      // Right swipe: complete/uncomplete
       background: Container(
         alignment: Alignment.centerLeft,
         padding: const EdgeInsets.only(left: 20),
         decoration: BoxDecoration(
-          color: const Color(0xFF34C759).withValues(alpha: 0.1),
+          color: AppColors.success.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Icon(
           todo.isCompleted
               ? Icons.undo_rounded
               : Icons.check_circle_outline_rounded,
-          color: const Color(0xFF34C759),
+          color: AppColors.success,
         ),
       ),
-      // Left swipe (end → start): delete
+      // Left swipe: delete
       secondaryBackground: Container(
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 20),
@@ -107,11 +110,11 @@ class SubTodoTile extends StatelessWidget {
       ),
       confirmDismiss: (direction) async {
         if (direction == DismissDirection.startToEnd) {
-          // Right swipe → toggle completion (don't actually dismiss)
+          // Right swipe: toggle completion (don't actually dismiss)
           onToggle();
           return false;
         }
-        // Left swipe → confirm delete
+        // Left swipe: confirm delete
         if (onDismissed == null) return false;
         return await showDialog<bool>(
           context: context,
@@ -136,7 +139,9 @@ class SubTodoTile extends StatelessWidget {
         onTap: onTap,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(borderRadius: BorderRadius.circular(12)),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppDimensions.cardRadius),
+          ),
           child: Row(
             children: [
               todo.isRecurring
@@ -157,10 +162,12 @@ class SubTodoTile extends StatelessWidget {
                             ? TextDecoration.lineThrough
                             : null,
                         color: todo.isCompleted
-                            ? theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)
+                            ? theme.colorScheme.onSurfaceVariant.withValues(
+                                alpha: 0.5,
+                              )
                             : overdue
-                                ? theme.colorScheme.error.withValues(alpha: 0.7)
-                                : null,
+                            ? theme.colorScheme.error.withValues(alpha: 0.7)
+                            : null,
                       ),
                     ),
                     if (todo.alarm != null) ...[
@@ -188,9 +195,6 @@ class SubTodoTile extends StatelessWidget {
   }
 }
 
-/// A tappable rounded-square repeat icon shown in place of the checkbox for
-/// recurring tasks.  Tapping it triggers the same [onTap] callback that the
-/// checkbox would — which advances the task to its next occurrence.
 class _RecurringRepeatButton extends StatelessWidget {
   final VoidCallback onTap;
 

@@ -3,11 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/habit.dart';
 import '../services/habit_service.dart';
-import '../services/notification_service.dart';
+import 'project_providers.dart';
 import 'settings_providers.dart';
 
-final habitListProvider =
-    AsyncNotifierProvider<HabitListNotifier, List<Habit>>(
+final habitListProvider = AsyncNotifierProvider<HabitListNotifier, List<Habit>>(
   HabitListNotifier.new,
 );
 
@@ -17,16 +16,16 @@ class HabitListNotifier extends AsyncNotifier<List<Habit>> {
     // Watch the storage path so the list reloads when the project folder changes.
     ref.watch(storagePathProvider);
     final service = ref.read(habitServiceProvider);
+    final notifService = ref.read(notificationServiceProvider);
 
     // Process any pending habit completions from background notification actions
     await _processHabitQueue(service);
 
     final habits = await service.loadHabits();
 
-    // Reschedule reminders for all habits with reminders enabled
     for (final h in habits) {
       if (h.reminderEnabled) {
-        NotificationService().scheduleHabitReminder(
+        notifService.scheduleHabitReminder(
           habitId: h.id,
           habitName: h.name,
           hour: h.reminderHour,
@@ -54,11 +53,8 @@ class HabitListNotifier extends AsyncNotifier<List<Habit>> {
 
       await queueFile.delete();
 
-      final today = DateTime.utc(
-        DateTime.now().year,
-        DateTime.now().month,
-        DateTime.now().day,
-      );
+      final now = DateTime.now();
+      final today = DateTime.utc(now.year, now.month, now.day);
 
       for (final habitId in lines) {
         try {
@@ -78,6 +74,7 @@ class HabitListNotifier extends AsyncNotifier<List<Habit>> {
     int goal = 0,
   }) async {
     final service = ref.read(habitServiceProvider);
+    final notifService = ref.read(notificationServiceProvider);
     final habit = await service.addHabit(
       name,
       color,
@@ -90,7 +87,7 @@ class HabitListNotifier extends AsyncNotifier<List<Habit>> {
     state = AsyncData([...state.value ?? [], habit]);
 
     if (reminderEnabled) {
-      NotificationService().scheduleHabitReminder(
+      notifService.scheduleHabitReminder(
         habitId: habit.id,
         habitName: habit.name,
         hour: reminderHour,
@@ -112,6 +109,7 @@ class HabitListNotifier extends AsyncNotifier<List<Habit>> {
 
   Future<void> updateHabit(Habit habit) async {
     final service = ref.read(habitServiceProvider);
+    final notifService = ref.read(notificationServiceProvider);
     await service.updateHabit(habit);
     final current = state.asData?.value;
     if (current == null) return;
@@ -119,9 +117,9 @@ class HabitListNotifier extends AsyncNotifier<List<Habit>> {
       current.map((h) => h.id == habit.id ? habit : h).toList(),
     );
 
-    NotificationService().cancelHabitReminder(habit.id);
+    notifService.cancelHabitReminder(habit.id);
     if (habit.reminderEnabled) {
-      NotificationService().scheduleHabitReminder(
+      notifService.scheduleHabitReminder(
         habitId: habit.id,
         habitName: habit.name,
         hour: habit.reminderHour,
@@ -144,21 +142,17 @@ class HabitListNotifier extends AsyncNotifier<List<Habit>> {
 
   Future<void> deleteHabit(String id) async {
     final service = ref.read(habitServiceProvider);
+    final notifService = ref.read(notificationServiceProvider);
     await service.deleteHabit(id);
     final current = state.asData?.value;
     if (current == null) return;
     state = AsyncData(current.where((h) => h.id != id).toList());
 
-    NotificationService().cancelHabitReminder(id);
+    notifService.cancelHabitReminder(id);
   }
 }
 
-
-
-final habitByIdProvider =
-    FutureProvider.family<Habit?, String>((ref, id) async {
-  final habits = await ref.watch(habitListProvider.future);
+final habitByIdProvider = Provider.family<Habit?, String>((ref, id) {
+  final habits = ref.watch(habitListProvider).asData?.value ?? [];
   return habits.where((h) => h.id == id).firstOrNull;
 });
-
-

@@ -30,6 +30,12 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
   /// to avoid flicker between drag-end and async persist.
   List<SubTodo>? _localPendingTodos;
 
+  /// Cached sorted lists – recomputed only when project identity changes.
+  List<SubTodo> _cachedPending = [];
+  List<SubTodo> _cachedCompleted = [];
+  MasterProject? _cachedProject;
+  bool _cachedSortByDueDate = false;
+
   Future<void> _queueArchive(MasterProject project) async {
     final messenger = ScaffoldMessenger.of(context);
     messenger.clearSnackBars();
@@ -93,8 +99,14 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       );
     }
 
-    final providerPendingTodos =
-        project.todos.where((t) => !t.isCompleted).toList()..sort((a, b) {
+    final hideCompleted = ref.watch(hideCompletedProvider);
+
+    if (project != _cachedProject || _sortByDueDate != _cachedSortByDueDate) {
+      _cachedProject = project;
+      _cachedSortByDueDate = _sortByDueDate;
+
+      _cachedPending = project.todos.where((t) => !t.isCompleted).toList()
+        ..sort((a, b) {
           if (_sortByDueDate) {
             if (a.alarm != null && b.alarm != null) {
               return a.alarm!.compareTo(b.alarm!);
@@ -109,22 +121,22 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           }
         });
 
+      _cachedCompleted = project.todos.where((t) => t.isCompleted).toList()
+        ..sort((a, b) {
+          if (a.alarm != null && b.alarm != null) {
+            return a.alarm!.compareTo(b.alarm!);
+          }
+          if (a.alarm != null) return -1;
+          if (b.alarm != null) return 1;
+          return 0;
+        });
+    }
+
     // Use local optimistic list if available (drag-reorder in progress),
-    // otherwise fall back to provider snapshot and clear local override.
-    final pendingTodos = _localPendingTodos ?? providerPendingTodos;
+    // otherwise fall back to provider snapshot.
+    final pendingTodos = _localPendingTodos ?? _cachedPending;
+    final completedTodos = _cachedCompleted;
 
-    final hideCompleted = ref.watch(hideCompletedProvider);
-    final completedTodos = project.todos.where((t) => t.isCompleted).toList()
-      ..sort((a, b) {
-        if (a.alarm != null && b.alarm != null) {
-          return a.alarm!.compareTo(b.alarm!);
-        }
-        if (a.alarm != null) return -1;
-        if (b.alarm != null) return 1;
-        return 0;
-      });
-
-    // Project background tint
     final bgTint = parseBgColor(project.bgColor);
     final scaffoldBg = bgTint != null
         ? Color.lerp(
@@ -138,7 +150,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       backgroundColor: scaffoldBg,
       appBar: AppBar(
         backgroundColor: scaffoldBg,
-        title: Text(project.title),
+        title: Text(project.title, style: theme.textTheme.headlineMedium),
         actions: [
           if (project.dday != null)
             Padding(
@@ -207,7 +219,6 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       ),
       body: CustomScrollView(
         slivers: [
-          // Description
           if (project.description != null && project.description!.isNotEmpty)
             SliverToBoxAdapter(
               child: Padding(
@@ -219,7 +230,6 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
               ),
             ),
 
-          // Empty state
           if (project.todos.isEmpty)
             SliverFillRemaining(
               hasScrollBody: false,
@@ -232,7 +242,9 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                       Icon(
                         Icons.edit_note_rounded,
                         size: 56,
-                        color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.25),
+                        color: theme.colorScheme.onSurfaceVariant.withValues(
+                          alpha: 0.25,
+                        ),
                       ),
                       const SizedBox(height: 12),
                       Text(
@@ -252,7 +264,6 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
               ),
             ),
 
-          // Progress summary
           if (project.todos.isNotEmpty)
             SliverToBoxAdapter(
               child: Padding(
@@ -269,7 +280,6 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
               ),
             ),
 
-          // Pending tasks header
           if (pendingTodos.isNotEmpty)
             SliverToBoxAdapter(
               child: Padding(
@@ -339,7 +349,6 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
               ),
             ),
 
-          // Pending tasks
           if (_sortByDueDate)
             SliverList(
               delegate: SliverChildBuilderDelegate((context, index) {
@@ -409,7 +418,6 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
               },
             ),
 
-          // Completed tasks header
           if (completedTodos.isNotEmpty && !hideCompleted)
             SliverToBoxAdapter(
               child: Padding(
@@ -432,7 +440,6 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
               ),
             ),
 
-          // Completed tasks
           if (!hideCompleted)
             SliverList(
               delegate: SliverChildBuilderDelegate((context, index) {
@@ -556,7 +563,6 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                   style: theme.textTheme.headlineSmall,
                 ),
                 const SizedBox(height: 14),
-                // Task name
                 TextField(
                   controller: titleController,
                   autofocus: !isEditing,
@@ -674,7 +680,6 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                       setSheetState(() => addToCalendar = value),
                 ),
                 const SizedBox(height: 16),
-                // Delete + Save buttons (equal width)
                 Row(
                   children: [
                     if (isEditing) ...[
@@ -828,9 +833,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
 
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => ProjectFormScreen(project: project),
-      ),
+      MaterialPageRoute(builder: (_) => ProjectFormScreen(project: project)),
     );
   }
 
@@ -917,7 +920,6 @@ class _ProgressSummary extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    // Tint the card background to match the project bg color
     final containerBg = bgTint != null
         ? Color.lerp(
             theme.cardColor,
@@ -926,7 +928,6 @@ class _ProgressSummary extends StatelessWidget {
           )!
         : theme.cardColor;
 
-    // Use the tint color for the progress indicator if available
     final accentColor = bgTint != null
         ? Color.lerp(
             theme.colorScheme.primary,
@@ -1035,7 +1036,6 @@ class _DdayChip extends StatelessWidget {
   }
 }
 
-/// A single compact container with Reminder + Repeat as two inline rows.
 class _CompactScheduleSection extends StatelessWidget {
   final ThemeData theme;
   final bool reminderEnabled;
@@ -1106,7 +1106,6 @@ class _CompactScheduleSection extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Alarm row — always visible
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 2),
             child: Row(
@@ -1161,7 +1160,6 @@ class _CompactScheduleSection extends StatelessWidget {
             thickness: 1,
             color: theme.dividerTheme.color ?? Colors.transparent,
           ),
-          // Reminder row
           IgnorePointer(
             ignoring: alarm == null,
             child: AnimatedOpacity(
@@ -1190,7 +1188,6 @@ class _CompactScheduleSection extends StatelessWidget {
                     thickness: 1,
                     color: theme.dividerTheme.color ?? Colors.transparent,
                   ),
-                  // Recurrence row
                   _ScheduleRow(
                     theme: theme,
                     icon: Icons.repeat_rounded,
@@ -1268,7 +1265,6 @@ class _CompactScheduleSection extends StatelessWidget {
   }
 }
 
-/// A single row: [icon] [label] [number field] [unit dropdown] [checkbox]
 class _ScheduleRow<T> extends StatelessWidget {
   final ThemeData theme;
   final IconData icon;
@@ -1309,7 +1305,6 @@ class _ScheduleRow<T> extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 2),
         child: Row(
           children: [
-            // Icon + label
             Icon(icon, size: 17, color: theme.colorScheme.primary),
             const SizedBox(width: 6),
             Text(
@@ -1317,7 +1312,6 @@ class _ScheduleRow<T> extends StatelessWidget {
               style: theme.textTheme.labelLarge?.copyWith(fontSize: 13),
             ),
             const SizedBox(width: 10),
-            // Value input (compact)
             SizedBox(
               width: 48,
               height: 34,
@@ -1353,7 +1347,6 @@ class _ScheduleRow<T> extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 6),
-            // Unit dropdown (compact)
             Expanded(
               child: SizedBox(
                 height: 34,
@@ -1403,7 +1396,6 @@ class _ScheduleRow<T> extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 6),
-            // Checkbox on far right
             SizedBox(
               width: 22,
               height: 22,

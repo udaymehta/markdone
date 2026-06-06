@@ -10,11 +10,8 @@ class ProjectFormScreen extends ConsumerStatefulWidget {
   final MasterProject? project;
   final String? filePath;
 
-  const ProjectFormScreen({
-    super.key,
-    this.project,
-    this.filePath,
-  }) : assert(project != null || filePath == null);
+  const ProjectFormScreen({super.key, this.project, this.filePath})
+    : assert(project != null || filePath == null);
 
   @override
   ConsumerState<ProjectFormScreen> createState() => _ProjectFormScreenState();
@@ -33,27 +30,6 @@ class _ProjectFormScreenState extends ConsumerState<ProjectFormScreen> {
 
   bool get _isEditing => widget.project != null;
 
-  InputDecoration _decoration({
-    required String labelText,
-    Widget? prefixIcon,
-    Widget? suffixIcon,
-    required ColorScheme colors,
-  }) {
-    final border = OutlineInputBorder(
-      borderRadius: BorderRadius.circular(4),
-      borderSide: BorderSide(color: colors.outline),
-    );
-    return InputDecoration(
-      labelText: labelText,
-      prefixIcon: prefixIcon,
-      suffixIcon: suffixIcon,
-      border: border,
-      enabledBorder: border,
-      focusedBorder: border,
-      isDense: true,
-    );
-  }
-
   @override
   void initState() {
     super.initState();
@@ -62,10 +38,12 @@ class _ProjectFormScreenState extends ConsumerState<ProjectFormScreen> {
     _titleCtrl.addListener(() => setState(() {}));
     _descCtrl = TextEditingController(text: p?.description ?? '');
     _dday = p?.dday;
-    _bgColor = p?.bgColor != null ? _parseBgColor(p!.bgColor!) : null;
+    _bgColor = p?.bgColor != null ? parseBgColor(p!.bgColor!) : null;
     _syncWithCalendar = p?.syncWithCalendar ?? false;
     _ddayCtrl = TextEditingController(
-      text: _dday != null ? MarkdoneDateFormatter.formatDate(_dday!) : 'Not set',
+      text: _dday != null
+          ? MarkdoneDateFormatter.formatDate(_dday!)
+          : 'Not set',
     );
     _bgColorCtrl = TextEditingController(
       text: _bgColor != null ? 'Set' : 'Not set',
@@ -104,29 +82,27 @@ class _ProjectFormScreenState extends ConsumerState<ProjectFormScreen> {
             ? _descCtrl.text.trim()
             : null,
         dday: _dday,
-        bgColor: _bgColor != null
-            ? colorToHexStringWithAlpha(_bgColor!)
-            : null,
+        bgColor: _bgColor != null ? colorToHexStringWithAlpha(_bgColor!) : null,
         syncWithCalendar: _syncWithCalendar,
         clearDescription: _descCtrl.text.trim().isEmpty,
         clearBgColor: _bgColor == null,
         clearDday: _dday == null,
       );
-      await ref.read(projectsProvider.notifier).updateProjectMetadata(
-        updated,
-      );
+      await ref.read(projectsProvider.notifier).updateProjectMetadata(updated);
     } else {
-      await ref.read(projectsProvider.notifier).createProject(
-        title: title,
-        dday: _dday,
-        description: _descCtrl.text.trim().isNotEmpty
-            ? _descCtrl.text.trim()
-            : null,
-        bgColor: _bgColor != null
-            ? colorToHexStringWithAlpha(_bgColor!)
-            : null,
-        syncWithCalendar: _syncWithCalendar,
-      );
+      await ref
+          .read(projectsProvider.notifier)
+          .createProject(
+            title: title,
+            dday: _dday,
+            description: _descCtrl.text.trim().isNotEmpty
+                ? _descCtrl.text.trim()
+                : null,
+            bgColor: _bgColor != null
+                ? colorToHexStringWithAlpha(_bgColor!)
+                : null,
+            syncWithCalendar: _syncWithCalendar,
+          );
     }
 
     if (mounted) Navigator.pop(context);
@@ -135,11 +111,13 @@ class _ProjectFormScreenState extends ConsumerState<ProjectFormScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colors = theme.colorScheme;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_isEditing ? 'Edit Project' : 'New Project'),
+        title: Text(
+          _isEditing ? 'Edit Project' : 'New Project',
+          style: theme.textTheme.headlineMedium,
+        ),
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
@@ -147,20 +125,18 @@ class _ProjectFormScreenState extends ConsumerState<ProjectFormScreen> {
           TextField(
             controller: _titleCtrl,
             autofocus: !_isEditing,
-            decoration: _decoration(
+            decoration: InputDecoration(
               labelText: 'Project name',
               prefixIcon: const Icon(Icons.folder_outlined),
-              colors: colors,
             ),
             textCapitalization: TextCapitalization.sentences,
           ),
           const SizedBox(height: 16),
           TextField(
             controller: _descCtrl,
-            decoration: _decoration(
+            decoration: InputDecoration(
               labelText: 'Description (optional)',
               prefixIcon: const Icon(Icons.notes_rounded),
-              colors: colors,
             ),
             textCapitalization: TextCapitalization.sentences,
             maxLines: 2,
@@ -170,20 +146,19 @@ class _ProjectFormScreenState extends ConsumerState<ProjectFormScreen> {
           TextFormField(
             controller: _ddayCtrl,
             readOnly: true,
-            decoration: _decoration(
+            decoration: InputDecoration(
               labelText: 'D-Day',
               prefixIcon: Icon(
-                _dday != null
-                    ? Icons.event_rounded
-                    : Icons.event_outlined,
+                _dday != null ? Icons.event_rounded : Icons.event_outlined,
               ),
               suffixIcon: _dday != null
                   ? IconButton(
                       icon: Icon(
                         Icons.close,
                         size: 18,
-                        color: theme.colorScheme.onSurface
-                            .withValues(alpha: 0.4),
+                        color: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.4,
+                        ),
                       ),
                       onPressed: () {
                         setState(() => _dday = null);
@@ -191,7 +166,6 @@ class _ProjectFormScreenState extends ConsumerState<ProjectFormScreen> {
                       },
                     )
                   : null,
-              colors: colors,
             ),
             onTap: _pickDday,
             style: TextStyle(
@@ -205,11 +179,10 @@ class _ProjectFormScreenState extends ConsumerState<ProjectFormScreen> {
             TextFormField(
               controller: _syncCtrl,
               readOnly: true,
-              decoration: _decoration(
+              decoration: InputDecoration(
                 labelText: 'Sync with calendar',
                 prefixIcon: const Icon(Icons.sync_rounded),
                 suffixIcon: const Icon(Icons.arrow_drop_down_rounded),
-                colors: colors,
               ),
               onTap: () {
                 setState(() {
@@ -223,7 +196,7 @@ class _ProjectFormScreenState extends ConsumerState<ProjectFormScreen> {
           TextFormField(
             controller: _bgColorCtrl,
             readOnly: true,
-            decoration: _decoration(
+            decoration: InputDecoration(
               labelText: 'Background color',
               prefixIcon: const Icon(Icons.palette_outlined),
               suffixIcon: _bgColor != null
@@ -246,8 +219,9 @@ class _ProjectFormScreenState extends ConsumerState<ProjectFormScreen> {
                           icon: Icon(
                             Icons.close,
                             size: 18,
-                            color: theme.colorScheme.onSurface
-                                .withValues(alpha: 0.4),
+                            color: theme.colorScheme.onSurface.withValues(
+                              alpha: 0.4,
+                            ),
                           ),
                           onPressed: () {
                             setState(() => _bgColor = null);
@@ -257,7 +231,6 @@ class _ProjectFormScreenState extends ConsumerState<ProjectFormScreen> {
                       ],
                     )
                   : null,
-              colors: colors,
             ),
             onTap: () async {
               final picked = await showBgColorPicker(context, _bgColor);
@@ -315,12 +288,4 @@ class _ProjectFormScreenState extends ConsumerState<ProjectFormScreen> {
       _ddayCtrl.text = MarkdoneDateFormatter.formatDate(picked);
     }
   }
-}
-
-Color? _parseBgColor(String? hex) {
-  if (hex == null) return null;
-  hex = hex.replaceAll('#', '');
-  if (hex.length == 6) return Color(int.parse('FF$hex', radix: 16));
-  if (hex.length == 8) return Color(int.parse(hex, radix: 16));
-  return null;
 }

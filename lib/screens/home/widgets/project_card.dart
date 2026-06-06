@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
+import '../../../core/app_dimensions.dart';
 import '../../../core/color_utils.dart';
 import '../../../core/date_formatters.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../models/master_project.dart';
 import '../../../models/sub_todo.dart';
 
-/// A card representing a single master project on the home screen.
 class ProjectCard extends StatelessWidget {
   final MasterProject project;
   final VoidCallback onTap;
@@ -30,12 +30,9 @@ class ProjectCard extends StatelessWidget {
     }
   }
 
-  /// Parses bgColor and returns a very subtle tint suitable for card background.
-  /// The stored alpha is halved further so the card tint is barely visible.
   Color? _cardBgTint(Color cardBase) {
     final parsed = parseBgColor(project.bgColor);
     if (parsed == null) return null;
-    // Use half the stored alpha for a subtle card tint
     final tintAlpha = (parsed.a * 0.5).clamp(0.0, 0.15);
     return Color.lerp(cardBase, parsed.withValues(alpha: 1.0), tintAlpha);
   }
@@ -55,7 +52,7 @@ class ProjectCard extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
           color: cardBg,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(AppDimensions.cardRadius),
           border: Border.all(
             color: theme.dividerTheme.color ?? Colors.transparent,
           ),
@@ -63,7 +60,6 @@ class ProjectCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Title row with optional D-day badge inline
             Row(
               children: [
                 Container(
@@ -98,7 +94,6 @@ class ProjectCard extends StatelessWidget {
               ],
             ),
 
-            // Due date inline text (below title, compact)
             if (project.dday != null) ...[
               Padding(
                 padding: const EdgeInsets.only(left: 11, top: 4),
@@ -181,7 +176,6 @@ class ProjectCard extends StatelessWidget {
 
             if (project.todos.isNotEmpty) ...[
               const SizedBox(height: 10),
-              // Progress row: bar + stats inline
               Row(
                 children: [
                   Expanded(
@@ -213,23 +207,21 @@ class ProjectCard extends StatelessWidget {
   }
 
   List<SubTodo> get _previewTodos {
-    final pending = project.todos.where((todo) => !todo.isCompleted).toList()
-      ..sort((a, b) {
-        final aOrder = a.sortOrder ?? a.lineIndex;
-        final bOrder = b.sortOrder ?? b.lineIndex;
-        return aOrder.compareTo(bOrder);
-      });
+    final sorted = List.of(project.todos);
+    sorted.sort((a, b) {
+      final aOrder = a.sortOrder ?? a.lineIndex;
+      final bOrder = b.sortOrder ?? b.lineIndex;
+      return aOrder.compareTo(bOrder);
+    });
 
-    if (hideCompleted) return pending.take(2).toList();
+    if (hideCompleted) {
+      return sorted.where((todo) => !todo.isCompleted).take(2).toList();
+    }
 
-    final completed = project.todos.where((todo) => todo.isCompleted).toList()
-      ..sort((a, b) => a.lineIndex.compareTo(b.lineIndex));
-
-    return [...pending, ...completed].take(2).toList();
+    return sorted.take(2).toList();
   }
 }
 
-/// Compact D-day pill badge shown inline in the title row.
 class _DdayBadge extends StatelessWidget {
   final MasterProject project;
   const _DdayBadge({required this.project});

@@ -13,7 +13,8 @@ class HabitDetailScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final habitsAsync = ref.watch(habitListProvider);
-    final liveHabit = habitsAsync.asData?.value.firstWhere(
+    final liveHabit =
+        habitsAsync.asData?.value.firstWhere(
           (h) => h.id == habit.id,
           orElse: () => habit,
         ) ??
@@ -24,7 +25,7 @@ class HabitDetailScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(liveHabit.name),
+        title: Text(liveHabit.name, style: theme.textTheme.headlineMedium),
         actions: [
           IconButton(
             icon: const Icon(Icons.edit_outlined),
@@ -47,7 +48,9 @@ class HabitDetailScreen extends ConsumerWidget {
                   label: 'Current Streak',
                   value: '${liveHabit.currentStreak} days',
                   icon: Icons.local_fire_department,
-                  color: liveHabit.currentStreak > 0 ? color : color.withValues(alpha: 0.5),
+                  color: liveHabit.currentStreak > 0
+                      ? color
+                      : color.withValues(alpha: 0.5),
                 ),
                 const SizedBox(width: 12),
                 _StatCard(
@@ -120,9 +123,7 @@ class HabitDetailScreen extends ConsumerWidget {
   void _editHabit(BuildContext context, WidgetRef ref, Habit liveHabit) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => HabitFormScreen(habit: liveHabit),
-      ),
+      MaterialPageRoute(builder: (_) => HabitFormScreen(habit: liveHabit)),
     );
   }
 
@@ -157,8 +158,6 @@ class HabitDetailScreen extends ConsumerWidget {
     }
   }
 }
-
-// --- Stat card ---
 
 class _StatCard extends StatelessWidget {
   final String label;
@@ -201,8 +200,7 @@ class _StatCard extends StatelessWidget {
                   Text(
                     label,
                     style: theme.textTheme.labelSmall?.copyWith(
-                      color: theme.colorScheme.onSurface
-                          .withValues(alpha: 0.6),
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                     ),
                   ),
                 ],
@@ -214,8 +212,6 @@ class _StatCard extends StatelessWidget {
     );
   }
 }
-
-// --- Completion rate bars ---
 
 class _CompletionRate extends StatelessWidget {
   final Habit habit;
@@ -289,8 +285,6 @@ class _CompletionRate extends StatelessWidget {
   }
 }
 
-// --- Line chart for habit trend ---
-
 class _TrendChart extends StatelessWidget {
   final Habit habit;
   final Color color;
@@ -310,12 +304,9 @@ class _TrendChart extends StatelessWidget {
     for (var i = 5; i >= 0; i--) {
       final weekDate = currentMonday.subtract(Duration(days: i * 7));
       final jan4 = DateTime(weekDate.year, 1, 4);
-      final firstWeek =
-          jan4.subtract(Duration(days: jan4.weekday - 1));
-      final weekNum =
-          ((weekDate.difference(firstWeek).inDays) / 7).floor() + 1;
-      final key =
-          '${weekDate.year}-W${weekNum.toString().padLeft(2, '0')}';
+      final firstWeek = jan4.subtract(Duration(days: jan4.weekday - 1));
+      final weekNum = ((weekDate.difference(firstWeek).inDays) / 7).floor() + 1;
+      final key = '${weekDate.year}-W${weekNum.toString().padLeft(2, '0')}';
       final value = breakdown[key] ?? 0;
       if (value > maxVal) maxVal = value;
       data.add(MapEntry(key, value));
@@ -380,7 +371,6 @@ class _LineChartPainter extends CustomPainter {
     final chartH = bottom - top;
     if (chartH <= 0 || chartW <= 0) return;
 
-    // Grid lines
     final gridPaint = Paint()
       ..color = isDark
           ? Colors.white.withValues(alpha: 0.05)
@@ -393,24 +383,21 @@ class _LineChartPainter extends CustomPainter {
 
     if (data.isEmpty) return;
 
-    // Points
     final points = <Offset>[];
     for (var i = 0; i < data.length; i++) {
-      final x = left + (data.length > 1 ? chartW * i / (data.length - 1) : chartW / 2);
+      final x =
+          left +
+          (data.length > 1 ? chartW * i / (data.length - 1) : chartW / 2);
       final y = bottom - (data[i].value / maxVal) * chartH;
       points.add(Offset(x, y));
     }
 
     if (data.length > 1) {
-      // Fill gradient
       final fillPaint = Paint()
         ..shader = LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [
-            color.withValues(alpha: 0.3),
-            color.withValues(alpha: 0.0),
-          ],
+          colors: [color.withValues(alpha: 0.3), color.withValues(alpha: 0.0)],
         ).createShader(Rect.fromLTWH(left, top, chartW, chartH));
       final fillPath = Path()..moveTo(points.first.dx, bottom);
       for (final p in points) {
@@ -420,7 +407,6 @@ class _LineChartPainter extends CustomPainter {
       fillPath.close();
       canvas.drawPath(fillPath, fillPaint);
 
-      // Line
       final linePaint = Paint()
         ..color = color
         ..strokeWidth = 2.5
@@ -434,13 +420,11 @@ class _LineChartPainter extends CustomPainter {
       canvas.drawPath(linePath, linePaint);
     }
 
-    // Dots
     for (final p in points) {
       canvas.drawCircle(p, 4, Paint()..color = color);
       canvas.drawCircle(p, 2, Paint()..color = Colors.white);
     }
 
-    // Labels
     final labelStyle = TextStyle(
       fontSize: 9,
       color: isDark
@@ -465,8 +449,6 @@ class _LineChartPainter extends CustomPainter {
   bool shouldRepaint(_LineChartPainter old) =>
       data != old.data || color != old.color || isDark != old.isDark;
 }
-
-// --- Monthly breakdown bars ---
 
 class _MonthlyBreakdown extends StatelessWidget {
   final Habit habit;
@@ -503,8 +485,18 @@ class _MonthlyBreakdown extends StatelessWidget {
         final month = int.parse(parts[1]);
         final year = int.parse(parts[0]);
         const months = [
-          'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-          'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+          'Jan',
+          'Feb',
+          'Mar',
+          'Apr',
+          'May',
+          'Jun',
+          'Jul',
+          'Aug',
+          'Sep',
+          'Oct',
+          'Nov',
+          'Dec',
         ];
         final fraction = maxVal > 0 ? entry.value / maxVal : 0.0;
 

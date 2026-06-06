@@ -1,14 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/color_utils.dart';
 import '../../../models/habit.dart';
 import '../../../providers/habit_providers.dart';
 import 'habit_constants.dart';
-
-Color _parseColor(String hex) {
-  hex = hex.replaceAll('#', '');
-  if (hex.length == 6) hex = 'FF$hex';
-  return Color(int.parse(hex, radix: 16));
-}
 
 bool _isLightColor(Color c) => c.computeLuminance() > 0.5;
 
@@ -19,15 +14,13 @@ class MiniHeatmap extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final color = _parseColor(habit.color);
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final color = parseHexColor(habit.color);
     final checkColor = _isLightColor(color) ? Colors.black : Colors.white;
 
-    final today = DateTime.utc(
-      DateTime.now().year,
-      DateTime.now().month,
-      DateTime.now().day,
-    );
+    final now = DateTime.now();
+    final today = DateTime.utc(now.year, now.month, now.day);
 
     final days = List.generate(4, (i) => today.subtract(Duration(days: 3 - i)));
 
@@ -53,14 +46,16 @@ class MiniHeatmap extends ConsumerWidget {
               width: heatmapCellSize,
               height: heatmapCellSize,
               decoration: BoxDecoration(
-                color: isDone ? color.withValues(alpha: 0.9) : Colors.transparent,
+                color: isDone
+                    ? color.withValues(alpha: 0.9)
+                    : Colors.transparent,
                 borderRadius: BorderRadius.circular(6),
                 border: Border.all(
                   color: isDone
                       ? color
                       : (isDark
-                          ? Colors.white.withValues(alpha: 0.2)
-                          : Colors.grey.withValues(alpha: 0.35)),
+                            ? Colors.white.withValues(alpha: 0.2)
+                            : theme.colorScheme.outlineVariant),
                   width: isDone ? 1 : 1.5,
                 ),
               ),

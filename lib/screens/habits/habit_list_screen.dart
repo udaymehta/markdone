@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/color_utils.dart';
 import '../../models/habit.dart';
 import '../../providers/habit_providers.dart';
 import '../../screens/settings/settings_screen.dart';
@@ -43,7 +44,7 @@ class HabitListScreen extends ConsumerWidget {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _addHabit(context, ref),
-        child: const Icon(Icons.add),
+        child: const Icon(Icons.add_rounded, size: 28),
       ),
     );
   }
@@ -61,29 +62,32 @@ class _EmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.celebration_outlined,
-            size: 64,
-            color: theme.colorScheme.onSurface.withValues(alpha: 0.3),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'No habits yet',
-            style: theme.textTheme.titleMedium?.copyWith(
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.celebration_outlined,
+              size: 64,
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.3),
             ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Tap + to create your first habit',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+            const SizedBox(height: 16),
+            Text(
+              'No habits yet',
+              style: theme.textTheme.titleMedium?.copyWith(
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+              ),
             ),
-          ),
-        ],
+            const SizedBox(height: 4),
+            Text(
+              'Tap + to create your first habit',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -99,6 +103,18 @@ Widget _buildDayHeaders(ThemeData theme) {
   );
   final days = List.generate(4, (i) => today.subtract(Duration(days: 3 - i)));
 
+  final dayNumStyle = theme.textTheme.labelSmall?.copyWith(
+    fontSize: 10,
+    fontWeight: FontWeight.w600,
+    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+    height: 1.2,
+  );
+  final dayAbbrStyle = theme.textTheme.labelSmall?.copyWith(
+    fontSize: 7,
+    color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+    height: 1.1,
+  );
+
   return Row(
     mainAxisSize: MainAxisSize.min,
     children: days.map((date) {
@@ -109,21 +125,12 @@ Widget _buildDayHeaders(ThemeData theme) {
           children: [
             Text(
               '${date.day}',
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                height: 1.2,
-              ),
+              style: dayNumStyle,
               textAlign: TextAlign.center,
             ),
             Text(
               _dayAbbr[date.weekday - 1],
-              style: TextStyle(
-                fontSize: 7,
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
-                height: 1.1,
-              ),
+              style: dayAbbrStyle,
               textAlign: TextAlign.center,
             ),
           ],
@@ -178,7 +185,7 @@ class _HabitListViewState extends ConsumerState<_HabitListView> {
             itemBuilder: (context, index) {
               final habit = widget.habits[index];
               final streak = habit.currentStreak;
-              final color = _parseColor(habit.color);
+              final color = parseHexColor(habit.color);
               final goal = habit.goal;
               final fill = goal > 0 ? (streak / goal).clamp(0.0, 1.0) : 1.0;
 
@@ -219,7 +226,8 @@ class _HabitListViewState extends ConsumerState<_HabitListView> {
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: Row(
-                                    crossAxisAlignment: CrossAxisAlignment.center,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.center,
                                     children: [
                                       Flexible(
                                         child: Text(
@@ -242,14 +250,13 @@ class _HabitListViewState extends ConsumerState<_HabitListView> {
                                         const SizedBox(width: 2),
                                         Text(
                                           '$streak',
-                                          style: theme
-                                              .textTheme.labelSmall
+                                          style: theme.textTheme.labelSmall
                                               ?.copyWith(
-                                            color: color.withValues(
-                                                alpha: 0.7),
-                                            fontWeight:
-                                                FontWeight.w600,
-                                          ),
+                                                color: color.withValues(
+                                                  alpha: 0.7,
+                                                ),
+                                                fontWeight: FontWeight.w600,
+                                              ),
                                         ),
                                       ],
                                     ],
@@ -273,12 +280,6 @@ class _HabitListViewState extends ConsumerState<_HabitListView> {
   }
 }
 
-Color _parseColor(String hex) {
-  hex = hex.replaceAll('#', '');
-  if (hex.length == 6) hex = 'FF$hex';
-  return Color(int.parse(hex, radix: 16));
-}
-
 class _ProgressBarPainter extends CustomPainter {
   final Color color;
   final double fill;
@@ -288,11 +289,11 @@ class _ProgressBarPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final bgPaint = Paint()
-      ..color = color.withAlpha(25)
+      ..color = color.withValues(alpha: 0.10)
       ..style = PaintingStyle.fill;
 
     final fillPaint = Paint()
-      ..color = color.withAlpha(200)
+      ..color = color.withValues(alpha: 0.78)
       ..style = PaintingStyle.fill;
 
     final r = 2.5;

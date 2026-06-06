@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/app_dimensions.dart';
 import '../../core/date_formatters.dart';
 import '../../core/theme/app_theme.dart';
 import '../../providers/project_providers.dart';
 
-/// Full-screen page displaying all D-Day events sorted by urgency.
 class DdayScreen extends ConsumerWidget {
   const DdayScreen({super.key});
 
@@ -78,13 +78,14 @@ class DdayScreen extends ConsumerWidget {
                   ),
                   child: Row(
                     children: [
-                      // D-Day badge
                       Container(
                         width: 72,
                         height: 72,
                         decoration: BoxDecoration(
                           color: urgencyColor.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius: BorderRadius.circular(
+                            AppDimensions.cardRadius,
+                          ),
                         ),
                         alignment: Alignment.center,
                         child: Text(

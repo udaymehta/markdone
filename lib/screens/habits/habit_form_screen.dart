@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/color_utils.dart';
+import '../../core/theme/app_theme.dart';
 import '../../models/habit.dart';
 import '../../providers/habit_providers.dart';
 
@@ -25,29 +26,6 @@ class _HabitFormScreenState extends ConsumerState<HabitFormScreen> {
 
   bool get _isEditing => widget.habit != null;
 
-  InputDecoration _decoration({
-    required String labelText,
-    Widget? prefixIcon,
-    Widget? suffixIcon,
-    String? hintText,
-    required ColorScheme colors,
-  }) {
-    final border = OutlineInputBorder(
-      borderRadius: BorderRadius.circular(4),
-      borderSide: BorderSide(color: colors.outline),
-    );
-    return InputDecoration(
-      labelText: labelText,
-      hintText: hintText,
-      prefixIcon: prefixIcon,
-      suffixIcon: suffixIcon,
-      border: border,
-      enabledBorder: border,
-      focusedBorder: border,
-      isDense: true,
-    );
-  }
-
   @override
   void initState() {
     super.initState();
@@ -57,7 +35,7 @@ class _HabitFormScreenState extends ConsumerState<HabitFormScreen> {
     _notifCtrl = TextEditingController(
       text: h?.notificationMessage ?? 'Did you complete this habit today?',
     );
-    _color = h != null ? _parseColor(h.color) : const Color(0xFF1e88e5);
+    _color = h != null ? parseHexColor(h.color) : AppColors.accent;
     _reminderSet = h?.reminderEnabled ?? false;
     _reminderHour = h?.reminderHour ?? 9;
     _reminderMinute = h?.reminderMinute ?? 0;
@@ -101,17 +79,19 @@ class _HabitFormScreenState extends ConsumerState<HabitFormScreen> {
       );
       await ref.read(habitListProvider.notifier).updateHabit(updated);
     } else {
-      await ref.read(habitListProvider.notifier).addHabit(
-        name,
-        colorToHexString(_color),
-        reminderEnabled: _reminderSet,
-        reminderHour: _reminderHour,
-        reminderMinute: _reminderMinute,
-        notificationMessage: _notifCtrl.text.trim().isNotEmpty
-            ? _notifCtrl.text.trim()
-            : 'Did you complete this habit today?',
-        goal: goalVal,
-      );
+      await ref
+          .read(habitListProvider.notifier)
+          .addHabit(
+            name,
+            colorToHexString(_color),
+            reminderEnabled: _reminderSet,
+            reminderHour: _reminderHour,
+            reminderMinute: _reminderMinute,
+            notificationMessage: _notifCtrl.text.trim().isNotEmpty
+                ? _notifCtrl.text.trim()
+                : 'Did you complete this habit today?',
+            goal: goalVal,
+          );
     }
 
     if (mounted) Navigator.pop(context);
@@ -120,17 +100,15 @@ class _HabitFormScreenState extends ConsumerState<HabitFormScreen> {
   Future<void> _pickTime() async {
     final time = await showTimePicker(
       context: context,
-      initialTime: TimeOfDay(
-        hour: _reminderHour,
-        minute: _reminderMinute,
-      ),
+      initialTime: TimeOfDay(hour: _reminderHour, minute: _reminderMinute),
     );
     if (time != null) {
       setState(() {
         _reminderHour = time.hour;
         _reminderMinute = time.minute;
         _reminderSet = true;
-        _reminderCtrl.text = '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+        _reminderCtrl.text =
+            '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
       });
     }
   }
@@ -145,11 +123,13 @@ class _HabitFormScreenState extends ConsumerState<HabitFormScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colors = theme.colorScheme;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_isEditing ? 'Edit Habit' : 'New Habit'),
+        title: Text(
+          _isEditing ? 'Edit Habit' : 'New Habit',
+          style: theme.textTheme.headlineMedium,
+        ),
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
@@ -161,7 +141,7 @@ class _HabitFormScreenState extends ConsumerState<HabitFormScreen> {
                 child: TextField(
                   controller: _nameCtrl,
                   autofocus: !_isEditing,
-                  decoration: _decoration(labelText: 'Habit name', colors: colors),
+                  decoration: InputDecoration(labelText: 'Habit name'),
                   textCapitalization: TextCapitalization.sentences,
                 ),
               ),
@@ -170,10 +150,7 @@ class _HabitFormScreenState extends ConsumerState<HabitFormScreen> {
                 height: 48,
                 child: GestureDetector(
                   onTap: () async {
-                    final result = await showAccentColorPicker(
-                      context,
-                      _color,
-                    );
+                    final result = await showAccentColorPicker(context, _color);
                     if (result != null) setState(() => _color = result);
                   },
                   child: Container(
@@ -182,8 +159,9 @@ class _HabitFormScreenState extends ConsumerState<HabitFormScreen> {
                       color: _color,
                       borderRadius: BorderRadius.circular(4),
                       border: Border.all(
-                        color: theme.colorScheme.onSurface
-                            .withValues(alpha: 0.2),
+                        color: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.2,
+                        ),
                       ),
                     ),
                   ),
@@ -194,10 +172,9 @@ class _HabitFormScreenState extends ConsumerState<HabitFormScreen> {
           const SizedBox(height: 16),
           TextField(
             controller: _notifCtrl,
-            decoration: _decoration(
+            decoration: InputDecoration(
               labelText: 'Notification message',
               hintText: 'Did you complete this habit today?',
-              colors: colors,
             ),
             textCapitalization: TextCapitalization.sentences,
             maxLines: 2,
@@ -207,38 +184,36 @@ class _HabitFormScreenState extends ConsumerState<HabitFormScreen> {
           TextFormField(
             controller: _reminderCtrl,
             readOnly: true,
-            decoration: _decoration(
+            decoration: InputDecoration(
               labelText: 'Daily Reminder',
               suffixIcon: _reminderSet
                   ? IconButton(
                       icon: Icon(
                         Icons.close,
                         size: 18,
-                        color: theme.colorScheme.onSurface
-                            .withValues(alpha: 0.4),
+                        color: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.4,
+                        ),
                       ),
                       onPressed: _clearReminder,
                     )
                   : null,
-              colors: colors,
             ),
             onTap: _pickTime,
             style: TextStyle(
               color: _reminderSet
                   ? theme.colorScheme.primary
                   : theme.colorScheme.onSurface.withValues(alpha: 0.3),
-              fontWeight:
-                  _reminderSet ? FontWeight.w600 : FontWeight.w400,
+              fontWeight: _reminderSet ? FontWeight.w600 : FontWeight.w400,
             ),
           ),
           const SizedBox(height: 16),
           TextFormField(
             controller: _goalCtrl,
             keyboardType: TextInputType.number,
-            decoration: _decoration(
+            decoration: InputDecoration(
               labelText: 'Goal (optional)',
               hintText: 'e.g. 7',
-              colors: colors,
             ),
           ),
         ],
@@ -269,10 +244,4 @@ class _HabitFormScreenState extends ConsumerState<HabitFormScreen> {
       ),
     );
   }
-}
-
-Color _parseColor(String hex) {
-  hex = hex.replaceAll('#', '');
-  if (hex.length == 6) hex = 'FF$hex';
-  return Color(int.parse(hex, radix: 16));
 }
