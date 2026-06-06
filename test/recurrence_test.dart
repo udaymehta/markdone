@@ -52,14 +52,139 @@ void main() {
       final reminder = ReminderConfig.fromString('2w');
 
       expect(reminder?.duration, const Duration(days: 14));
-      expect(reminder?.label, '2 weeks');
+      expect(reminder?.label, '2 wks');
     });
 
     test('prefers compact week labels for divisible durations', () {
       final reminder = ReminderConfig.fromDuration(const Duration(days: 14));
 
       expect(reminder?.compact, '2w');
-      expect(reminder?.label, '2 weeks');
+      expect(reminder?.label, '2 wks');
+    });
+  });
+
+  group('Edge cases', () {
+    test('minutely recurrence advances correctly', () {
+      final next = RecurrenceService.nextOccurrence(
+        alarm: DateTime(2026, 1, 1, 8, 0),
+        rule: RecurrenceRule.fromAlarm(
+          frequency: RecurrenceFrequency.minutely,
+          alarm: DateTime(2026, 1, 1, 8, 0),
+        ),
+        after: DateTime(2026, 1, 1, 8, 0),
+      );
+      expect(next, DateTime(2026, 1, 1, 8, 1));
+    });
+
+    test('minutely custom interval', () {
+      final next = RecurrenceService.nextOccurrence(
+        alarm: DateTime(2026, 1, 1, 8, 0),
+        rule: RecurrenceRule.fromAlarm(
+          frequency: RecurrenceFrequency.minutely,
+          alarm: DateTime(2026, 1, 1, 8, 0),
+          interval: 15,
+        ),
+        after: DateTime(2026, 1, 1, 8, 30),
+      );
+      expect(next, DateTime(2026, 1, 1, 8, 45));
+    });
+
+    test('minutely rolls into next hour', () {
+      final next = RecurrenceService.nextOccurrence(
+        alarm: DateTime(2026, 1, 1, 8, 55),
+        rule: RecurrenceRule.fromAlarm(
+          frequency: RecurrenceFrequency.minutely,
+          alarm: DateTime(2026, 1, 1, 8, 55),
+          interval: 10,
+        ),
+        after: DateTime(2026, 1, 1, 8, 55),
+      );
+      expect(next, DateTime(2026, 1, 1, 9, 5));
+    });
+
+    test('hourly crosses midnight', () {
+      final next = RecurrenceService.nextOccurrence(
+        alarm: DateTime(2026, 1, 1, 23, 0),
+        rule: RecurrenceRule.fromAlarm(
+          frequency: RecurrenceFrequency.hourly,
+          alarm: DateTime(2026, 1, 1, 23, 0),
+          interval: 2,
+        ),
+        after: DateTime(2026, 1, 1, 23, 0),
+      );
+      expect(next, DateTime(2026, 1, 2, 1, 0));
+    });
+
+    test('daily skips correct number of days', () {
+      final next = RecurrenceService.nextOccurrence(
+        alarm: DateTime(2026, 1, 1),
+        rule: RecurrenceRule.fromAlarm(
+          frequency: RecurrenceFrequency.daily,
+          alarm: DateTime(2026, 1, 1),
+          interval: 3,
+        ),
+        after: DateTime(2026, 1, 5),
+      );
+      expect(next, DateTime(2026, 1, 7));
+    });
+
+    test('weekly with custom interval skips 2 weeks', () {
+      final next = RecurrenceService.nextOccurrence(
+        alarm: DateTime(2026, 1, 5),
+        rule: RecurrenceRule.fromAlarm(
+          frequency: RecurrenceFrequency.weekly,
+          alarm: DateTime(2026, 1, 5),
+          interval: 2,
+        ),
+        after: DateTime(2026, 1, 19),
+      );
+      expect(next, DateTime(2026, 2, 2));
+    });
+
+    test('monthly clamps to last day of February', () {
+      final next = RecurrenceService.nextOccurrence(
+        alarm: DateTime(2025, 1, 31),
+        rule: RecurrenceRule.fromAlarm(
+          frequency: RecurrenceFrequency.monthly,
+          alarm: DateTime(2025, 1, 31),
+        ),
+        after: DateTime(2025, 1, 31),
+      );
+      expect(next, DateTime(2025, 2, 28));
+    });
+
+    test('monthly with interval skips 3 months', () {
+      final next = RecurrenceService.nextOccurrence(
+        alarm: DateTime(2026, 1, 15),
+        rule: RecurrenceRule.fromAlarm(
+          frequency: RecurrenceFrequency.monthly,
+          alarm: DateTime(2026, 1, 15),
+          interval: 3,
+        ),
+        after: DateTime(2026, 4, 15),
+      );
+      expect(next, DateTime(2026, 7, 15));
+    });
+
+    test('retargetToAlarm sets anchorDay for monthly', () {
+      final rule = RecurrenceRule.fromAlarm(
+        frequency: RecurrenceFrequency.monthly,
+        alarm: DateTime(2026, 6, 15, 9, 0),
+      );
+      expect(rule.anchorDay, 15);
+    });
+
+    test('boundary: alarm in the future', () {
+      final future = DateTime.now().add(const Duration(days: 365));
+      final next = RecurrenceService.nextOccurrence(
+        alarm: future,
+        rule: RecurrenceRule.fromAlarm(
+          frequency: RecurrenceFrequency.daily,
+          alarm: future,
+        ),
+        after: future,
+      );
+      expect(next, future.add(const Duration(days: 1)));
     });
   });
 
