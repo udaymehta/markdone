@@ -55,7 +55,8 @@ class MiniHeatmap extends ConsumerWidget {
                       ? color
                       : (isDark
                             ? Colors.white.withValues(alpha: 0.2)
-                            : theme.colorScheme.outlineVariant),
+                            : theme.colorScheme.outlineVariant
+                                .withValues(alpha: 0.4)),
                   width: isDone ? 1 : 1.5,
                 ),
               ),

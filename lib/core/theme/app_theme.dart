@@ -7,10 +7,10 @@ class AppColors {
   static const Color accentLight = Color(0xFFFF9A6C);
   static const Color accentDark = Color(0xFFD94F1E);
 
-  static const Color darkSurface = Color(0xFF121212);
-  static const Color darkSurfaceVariant = Color(0xFF1A1A1A);
-  static const Color darkCard = Color(0xFF161616);
-  static const Color darkCardHover = Color(0xFF1E1E1E);
+  static const Color darkSurface = Color(0xFF242424);
+  static const Color darkSurfaceVariant = Color(0xFF2C2C2C);
+  static const Color darkCard = Color(0xFF282828);
+  static const Color darkCardHover = Color(0xFF303030);
 
   static const Color amoledSurface = Color(0xFF000000);
   static const Color amoledSurfaceVariant = Color(0xFF111118);
