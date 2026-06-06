@@ -59,11 +59,11 @@ dev_dependencies:
 
 flutter_launcher_icons:
   android: true
-  ios: true
+  ios: false
   image_path: "assets/icon/combined.png"
   remove_alpha_ios: true
   min_sdk_android: 26
-  adaptive_icon_background: "#1e88e5"
+  adaptive_icon_background: "#543680"
   adaptive_icon_foreground: "assets/icon/foreground.png"
 
 flutter:
