@@ -1,29 +1,18 @@
 import 'package:flutter/foundation.dart';
 import 'sub_todo.dart';
 
-/// Represents a Master Project – one `.md` file.
-///
-/// The YAML frontmatter stores project-level metadata:
-/// ```yaml
-/// ---
-/// title: My Project
-/// created: 2026-01-15
-/// dday: 2026-06-01
-/// color: "#FF6B35"
-/// ---
-/// ```
 @immutable
 class MasterProject {
   final String filePath;
   final String title;
   final DateTime created;
-  final DateTime? dday; // D-Day target date
-  final String? color; // Hex color override for this project
-  final String? bgColor; // Hex+alpha background tint for project page
-  final String? description; // Optional description from frontmatter
+  final DateTime? dday;
+  final String? color;
+  final String? bgColor;
+  final String? description;
   final List<SubTodo> todos;
-  final String bodyMarkdown; // Raw body (non-frontmatter) content
-  final bool syncWithCalendar; // Whether to sync todos with device calendar
+  final String bodyMarkdown;
+  final bool syncWithCalendar;
 
   const MasterProject({
     required this.filePath,
@@ -68,42 +57,33 @@ class MasterProject {
     );
   }
 
-  /// File name without path and extension.
   String get fileName {
     final name = filePath.split('/').last;
     if (name.endsWith('.md')) return name.substring(0, name.length - 3);
     return name;
   }
 
-  /// Progress as a fraction (0.0 – 1.0).
   double get progress {
     if (todos.isEmpty) return 0.0;
     final done = todos.where((t) => t.isCompleted).length;
     return done / todos.length;
   }
 
-  /// Number of completed todos.
   int get completedCount => todos.where((t) => t.isCompleted).length;
 
-  /// Number of pending todos.
   int get pendingCount => todos.where((t) => !t.isCompleted).length;
 
-  /// Whether all tasks in the project are completed.
   bool get isCompletedProject => todos.isNotEmpty && pendingCount == 0;
 
-  /// Whether this project is stored in the archive folder.
   bool get isArchived => filePath.split('/').contains('archive');
 
-  /// Days until D-Day (negative = past).
   int? get daysUntilDday {
     if (dday == null) return null;
     return dday!.difference(DateTime.now()).inDays;
   }
 
-  /// Whether the D-Day has passed.
   bool get isDdayPast => daysUntilDday != null && daysUntilDday! < 0;
 
-  /// YAML frontmatter map for serialization.
   Map<String, dynamic> toFrontmatterMap() {
     final map = <String, dynamic>{
       'title': title,

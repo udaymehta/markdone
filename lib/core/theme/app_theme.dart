@@ -1,44 +1,35 @@
 import 'package:flutter/material.dart';
 
-/// MarkDone! brand colors – a distinctive warm amber accent
-/// paired with deep surface tones for a modern, minimal aesthetic.
 class AppColors {
   AppColors._();
 
-  // Primary accent – warm amber/orange
   static const Color accent = Color(0xFFFF6B35);
   static const Color accentLight = Color(0xFFFF9A6C);
   static const Color accentDark = Color(0xFFD94F1E);
 
-  // Dark theme surfaces (deep neutral grey — darker than original, not quite AMOLED)
   static const Color darkSurface = Color(0xFF121212);
   static const Color darkSurfaceVariant = Color(0xFF1A1A1A);
   static const Color darkCard = Color(0xFF161616);
   static const Color darkCardHover = Color(0xFF1E1E1E);
 
-  // AMOLED surfaces (pure black for OLED screens)
   static const Color amoledSurface = Color(0xFF000000);
   static const Color amoledSurfaceVariant = Color(0xFF111118);
   static const Color amoledCard = Color(0xFF0A0A12);
   static const Color amoledCardHover = Color(0xFF161620);
 
-  // Light theme surfaces
   static const Color lightSurface = Color(0xFFFAFAFC);
   static const Color lightSurfaceVariant = Color(0xFFF0F0F5);
   static const Color lightCard = Color(0xFFFFFFFF);
 
-  // Text
   static const Color darkText = Color(0xFFF2F2F7);
   static const Color darkTextSecondary = Color(0xFF8E8E93);
   static const Color lightText = Color(0xFF1C1C1E);
   static const Color lightTextSecondary = Color(0xFF636366);
 
-  // Status
   static const Color success = Color(0xFF34C759);
   static const Color warning = Color(0xFFFFCC02);
   static const Color error = Color(0xFFFF3B30);
 
-  // D-Day urgency
   static const Color ddayUrgent = Color(0xFFFF3B30);
   static const Color ddaySoon = Color(0xFFFF9500);
   static const Color ddayRelaxed = Color(0xFF30D158);

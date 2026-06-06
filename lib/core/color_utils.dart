@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-/// Parses a hex color string (e.g. "#AARRGGBB" or "#RRGGBB") into a [Color].
 Color? parseBgColor(String? value) {
   if (value == null || value.isEmpty) return null;
   try {
@@ -14,7 +13,12 @@ Color? parseBgColor(String? value) {
   return null;
 }
 
-/// Converts a [Color] to "#RRGGBB" hex string for storage (opaque).
+Color parseHexColor(String hex) {
+  hex = hex.replaceAll('#', '');
+  if (hex.length == 6) hex = 'FF$hex';
+  return Color(int.parse(hex, radix: 16));
+}
+
 String colorToHexString(Color color) {
   final r = (color.r * 255).round().toRadixString(16).padLeft(2, '0');
   final g = (color.g * 255).round().toRadixString(16).padLeft(2, '0');
@@ -22,7 +26,6 @@ String colorToHexString(Color color) {
   return '#$r$g$b';
 }
 
-/// Converts a [Color] to "#AARRGGBB" hex string for storage.
 String colorToHexStringWithAlpha(Color color) {
   final r = (color.r * 255).round().toRadixString(16).padLeft(2, '0');
   final g = (color.g * 255).round().toRadixString(16).padLeft(2, '0');
@@ -31,7 +34,6 @@ String colorToHexStringWithAlpha(Color color) {
   return '#$a$r$g$b';
 }
 
-/// Picks a color from HSV with hue bar + saturation/brightness plane + hex input.
 Future<Color?> showAccentColorPicker(
   BuildContext context,
   Color initialColor,
@@ -49,7 +51,12 @@ Future<Color?> showAccentColorPicker(
     builder: (ctx) => StatefulBuilder(
       builder: (ctx, setPickerState) {
         final theme = Theme.of(ctx);
-        final currentColor = HSLColor.fromAHSL(1.0, hue, saturation, lightness).toColor();
+        final currentColor = HSLColor.fromAHSL(
+          1.0,
+          hue,
+          saturation,
+          lightness,
+        ).toColor();
 
         return AlertDialog(
           title: const Text('Accent Color'),
@@ -59,25 +66,24 @@ Future<Color?> showAccentColorPicker(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Preview
                 Container(
                   height: 48,
                   decoration: BoxDecoration(
                     color: currentColor,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.2),
+                      color: theme.colorScheme.onSurfaceVariant.withValues(
+                        alpha: 0.2,
+                      ),
                     ),
                   ),
                 ),
                 const SizedBox(height: 16),
-                // Hue bar
                 _HueBar(
                   hue: hue,
                   onChanged: (v) => setPickerState(() => hue = v),
                 ),
                 const SizedBox(height: 12),
-                // Saturation / Brightness plane
                 _SaturationLightnessPicker(
                   hue: hue,
                   saturation: saturation,
@@ -88,10 +94,13 @@ Future<Color?> showAccentColorPicker(
                   }),
                 ),
                 const SizedBox(height: 12),
-                // Hex input
                 Row(
                   children: [
-                    Icon(Icons.tag_rounded, size: 16, color: theme.colorScheme.onSurfaceVariant),
+                    Icon(
+                      Icons.tag_rounded,
+                      size: 16,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
                     const SizedBox(width: 6),
                     SizedBox(
                       width: 120,
@@ -100,9 +109,14 @@ Future<Color?> showAccentColorPicker(
                         decoration: const InputDecoration(
                           isDense: true,
                           hintText: '#RRGGBB',
-                          contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 8,
+                          ),
                         ),
-                        style: theme.textTheme.bodySmall?.copyWith(fontFamily: 'monospace'),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontFamily: 'monospace',
+                        ),
                         textCapitalization: TextCapitalization.characters,
                         onChanged: (value) {
                           final parsed = parseBgColor(value);
@@ -147,7 +161,6 @@ Future<Color?> showAccentColorPicker(
   );
 }
 
-/// A horizontal hue slider bar.
 class _HueBar extends StatelessWidget {
   final double hue;
   final ValueChanged<double> onChanged;
@@ -166,12 +179,21 @@ class _HueBar extends StatelessWidget {
             return GestureDetector(
               onHorizontalDragUpdate: (details) {
                 final renderBox = context.findRenderObject() as RenderBox;
-                final localPos = renderBox.globalToLocal(details.globalPosition);
-                final fraction = (localPos.dx / constraints.maxWidth).clamp(0.0, 1.0);
+                final localPos = renderBox.globalToLocal(
+                  details.globalPosition,
+                );
+                final fraction = (localPos.dx / constraints.maxWidth).clamp(
+                  0.0,
+                  1.0,
+                );
                 onChanged(fraction * 360);
               },
               onTapDown: (details) {
-                final fraction = (details.localPosition.dx / constraints.maxWidth).clamp(0.0, 1.0);
+                final fraction =
+                    (details.localPosition.dx / constraints.maxWidth).clamp(
+                      0.0,
+                      1.0,
+                    );
                 onChanged(fraction * 360);
               },
               child: Container(
@@ -181,7 +203,8 @@ class _HueBar extends StatelessWidget {
                   gradient: LinearGradient(
                     colors: List.generate(
                       360 ~/ 10,
-                      (i) => HSLColor.fromAHSL(1.0, i * 10.0, 1.0, 0.5).toColor(),
+                      (i) =>
+                          HSLColor.fromAHSL(1.0, i * 10.0, 1.0, 0.5).toColor(),
                     ),
                   ),
                 ),
@@ -206,7 +229,6 @@ class _HueBar extends StatelessWidget {
   }
 }
 
-/// A 2D saturation × lightness picker for a given hue.
 class _SaturationLightnessPicker extends StatelessWidget {
   final double hue;
   final double saturation;
@@ -228,7 +250,10 @@ class _SaturationLightnessPicker extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Saturation / Brightness', style: Theme.of(context).textTheme.bodySmall),
+        Text(
+          'Saturation / Brightness',
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
         const SizedBox(height: 4),
         GestureDetector(
           onHorizontalDragUpdate: (details) {
@@ -291,18 +316,16 @@ class _SLPainter extends CustomPainter {
     final w = size.width;
     final h = size.height;
 
-    // Draw white → hue (left to right, saturation increases)
     final satGradient = LinearGradient(
       colors: [Colors.white, hueColor],
       begin: Alignment.centerLeft,
       end: Alignment.centerRight,
     );
 
-    // Fill with saturation gradient first
-    final paint = Paint()..shader = satGradient.createShader(Rect.fromLTWH(0, 0, w, h));
+    final paint = Paint()
+      ..shader = satGradient.createShader(Rect.fromLTWH(0, 0, w, h));
     canvas.drawRect(Rect.fromLTWH(0, 0, w, h), paint);
 
-    // Overlay black → transparent (top to bottom, lightness decreases)
     final lightGradient = LinearGradient(
       colors: [Colors.transparent, Colors.black],
       begin: Alignment.topCenter,
@@ -350,10 +373,10 @@ class _SLIndicatorPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_SLIndicatorPainter oldDelegate) =>
-      oldDelegate.saturation != saturation || oldDelegate.lightness != lightness;
+      oldDelegate.saturation != saturation ||
+      oldDelegate.lightness != lightness;
 }
 
-/// Shows a color picker dialog with preset colors and an opacity slider.
 Future<Color?> showBgColorPicker(
   BuildContext context,
   Color? initialColor,
@@ -392,7 +415,6 @@ Future<Color?> showBgColorPicker(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Preview
                 Container(
                   height: 40,
                   decoration: BoxDecoration(
@@ -406,7 +428,6 @@ Future<Color?> showBgColorPicker(
                   ),
                 ),
                 const SizedBox(height: 12),
-                // Color grid
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
@@ -434,7 +455,6 @@ Future<Color?> showBgColorPicker(
                   }).toList(),
                 ),
                 const SizedBox(height: 14),
-                // Opacity slider
                 Row(
                   children: [
                     Text('Opacity', style: theme.textTheme.bodySmall),

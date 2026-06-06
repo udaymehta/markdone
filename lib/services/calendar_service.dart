@@ -6,7 +6,6 @@ import '../core/timezone_utils.dart';
 import '../models/sub_todo.dart';
 import '../models/master_project.dart';
 
-/// Lightweight representation of a device calendar for picker UI.
 class CalendarInfo {
   final String id;
   final String name;
@@ -24,14 +23,12 @@ class CalendarInfo {
     this.isReadOnly = false,
   });
 
-  /// Human-readable display name.
   String get displayName {
     if (name.isNotEmpty && name != accountName) return name;
     if (accountName.isNotEmpty) return accountName;
     return 'Calendar $id';
   }
 
-  /// Subtitle for the picker: shows account or type info.
   String get subtitle {
     if (name.isNotEmpty && name != accountName && accountName.isNotEmpty) {
       return accountName;
@@ -41,7 +38,6 @@ class CalendarInfo {
   }
 }
 
-/// Manages 2-way sync between sub-todos and Android Calendar events.
 class CalendarService {
   static final CalendarService _instance = CalendarService._();
   factory CalendarService() => _instance;
@@ -68,16 +64,6 @@ class CalendarService {
     _tzInitialized = true;
   }
 
-  // ── Timezone helpers ──
-
-  /// Converts any DateTime (including TZDateTime or UTC DateTime) to a plain
-  /// local DateTime whose year/month/day/hour/minute/second represent the
-  /// wall-clock time in the device's local timezone.
-  ///
-  /// The device_calendar plugin returns TZDateTime objects that may be in UTC.
-  /// We must convert to the local timezone first, then extract wall-clock
-  /// components so the rest of the app (which stores offset-free local times)
-  /// gets the correct values.
   static DateTime toPlainLocal(DateTime dt) {
     if (dt is tz.TZDateTime) {
       // Convert to local timezone FIRST, then extract components.
@@ -109,13 +95,6 @@ class CalendarService {
     return dt;
   }
 
-  /// Constructs a TZDateTime in the device-local timezone from a DateTime.
-  ///
-  /// - If [dt] is already a TZDateTime (possibly UTC), converts the instant
-  ///   to the local timezone.
-  /// - If [dt] is a plain UTC DateTime, converts to local.
-  /// - If [dt] is a plain local DateTime, builds from its components
-  ///   (the values already represent local wall-clock time).
   static tz.TZDateTime toLocalTZ(DateTime dt) {
     if (dt is tz.TZDateTime) {
       return tz.TZDateTime.from(dt, tz.local);
@@ -123,7 +102,6 @@ class CalendarService {
     if (dt.isUtc) {
       return tz.TZDateTime.from(dt, tz.local);
     }
-    // Plain local DateTime — build from components.
     return tz.TZDateTime(
       tz.local,
       dt.year,
@@ -136,24 +114,17 @@ class CalendarService {
     );
   }
 
-  // ── Permissions ──
-
-  /// Best-effort permission check. Returns true if we believe permissions are
-  /// granted; false otherwise. The plugin's native methods also handle
-  /// permission re-requests internally, so this is just a fast-path hint.
   Future<bool> ensurePermissions() async {
     if (!Platform.isAndroid && !Platform.isIOS) return false;
     if (_hasPermission) return true;
 
     try {
-      // Check if already granted.
       final check = await _plugin.hasPermissions();
       if (check.isSuccess && (check.data ?? false)) {
         _hasPermission = true;
         return true;
       }
 
-      // Request if not yet granted.
       final req = await _plugin.requestPermissions();
       _hasPermission = req.isSuccess && (req.data ?? false);
       return _hasPermission;
@@ -164,14 +135,6 @@ class CalendarService {
     }
   }
 
-  // ── Calendar listing ──
-
-  /// Retrieve available calendars, mapped to our [CalendarInfo] model so we
-  /// never depend on the plugin's nullable fields downstream.
-  ///
-  /// We intentionally do NOT pre-check permissions here — the plugin's native
-  /// `retrieveCalendars()` already requests permissions if needed, and doing
-  /// a separate Dart-side check can conflict with it.
   Future<List<CalendarInfo>> getCalendars() async {
     if (!Platform.isAndroid && !Platform.isIOS) return [];
 
@@ -240,10 +203,6 @@ class CalendarService {
     }
   }
 
-  // ── Event CRUD ──
-
-  /// Creates or updates a calendar event for a sub-todo.
-  /// Returns the event ID on success, null on failure.
   Future<String?> upsertEvent({
     required String calendarId,
     required SubTodo todo,
@@ -260,7 +219,6 @@ class CalendarService {
         event.eventId = existingEventId;
       }
 
-      // Debug: log the raw alarm and conversion result
       final rawAlarm = todo.alarm!;
       final tzStart = toLocalTZ(rawAlarm);
       _log(
@@ -301,7 +259,6 @@ class CalendarService {
     }
   }
 
-  /// Deletes a calendar event by ID.
   Future<bool> deleteEvent({
     required String calendarId,
     required String eventId,
@@ -316,7 +273,6 @@ class CalendarService {
     }
   }
 
-  /// Retrieve all events in a calendar within +/- 1 year.
   Future<List<Event>> _retrieveCalendarEvents(String calendarId) async {
     await _ensureTimezone();
     final now = DateTime.now();
@@ -334,7 +290,6 @@ class CalendarService {
     return [];
   }
 
-  /// Retrieves a single event by ID.
   Future<Event?> getEvent({
     required String calendarId,
     required String eventId,
@@ -350,19 +305,6 @@ class CalendarService {
     }
   }
 
-  // ── 2-Way Sync ──
-
-  /// Full 2-way sync for a single project:
-  ///
-  /// **Push** – for every todo that has an alarm but no calendarEventId,
-  /// create a new calendar event. For todos that already have a calendarEventId,
-  /// push any local time changes to the calendar.
-  ///
-  /// **Pull** – if a calendar event was modified externally (time changed),
-  /// update the todo's alarm to match.
-  ///
-  /// Returns an updated copy of the project if anything changed, or null if
-  /// nothing was modified.
   Future<MasterProject?> syncProject({
     required MasterProject project,
     required String calendarId,
@@ -411,13 +353,11 @@ class CalendarService {
         continue;
       }
 
-      // No alarm → nothing to sync.
       if (todo.alarm == null) {
         updatedTodos.add(todo);
         continue;
       }
 
-      // ─── Push: create event if it doesn't exist yet ───
       if (todo.calendarEventId == null) {
         final newId = await upsertEvent(
           calendarId: calendarId,
@@ -433,10 +373,9 @@ class CalendarService {
         continue;
       }
 
-      // ─── Event exists → compare times (2-way) ───
       final existing = eventById[todo.calendarEventId];
       if (existing == null) {
-        // Event was deleted externally → re-create it.
+        // Event deleted externally - re-create it.
         final newId = await upsertEvent(
           calendarId: calendarId,
           todo: todo,
@@ -470,7 +409,7 @@ class CalendarService {
         );
 
         if (drift > const Duration(minutes: 1)) {
-          // Pull: calendar event changed externally → update local alarm.
+          // Pull: calendar event changed externally - update local alarm.
           updatedTodos.add(todo.copyWith(alarm: externalLocal));
           anyChanged = true;
           _log(
@@ -481,7 +420,6 @@ class CalendarService {
         }
       }
 
-      // Push: make sure the event title/reminders are up-to-date.
       await upsertEvent(
         calendarId: calendarId,
         todo: todo,
@@ -497,8 +435,6 @@ class CalendarService {
     return null;
   }
 
-  /// Sync all projects that have `syncWithCalendar == true`.
-  /// Returns a map of filePath → updated project for those that changed.
   Future<Map<String, MasterProject>> syncAllProjects({
     required List<MasterProject> projects,
     required String calendarId,

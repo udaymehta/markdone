@@ -26,7 +26,7 @@ class Habit {
     this.goal = 0,
     Iterable<DateTime>? completedDates,
   }) : _completedDates = SplayTreeSet<DateTime>((a, b) => a.compareTo(b))
-    ..addAll((completedDates ?? []).map(_normalizeDate));
+         ..addAll((completedDates ?? []).map(_normalizeDate));
 
   static DateTime _normalizeDate(DateTime dt) =>
       DateTime.utc(dt.year, dt.month, dt.day);
@@ -103,8 +103,7 @@ class Habit {
     }
 
     var streak = 0;
-    final checkDate =
-        _completedDates.contains(today) ? today : yesterday;
+    final checkDate = _completedDates.contains(today) ? today : yesterday;
 
     var cursor = checkDate;
     while (_completedDates.contains(cursor)) {
@@ -136,9 +135,9 @@ class Habit {
 
   double completionRate(int days) {
     if (days <= 0) return 0;
-    final start = _normalizeDate(DateTime.now()).subtract(
-      Duration(days: days - 1),
-    );
+    final start = _normalizeDate(
+      DateTime.now(),
+    ).subtract(Duration(days: days - 1));
     final end = _normalizeDate(DateTime.now());
     var count = 0;
     for (final d in _completedDates) {
@@ -163,7 +162,8 @@ class Habit {
     final breakdown = <String, int>{};
     for (final d in _completedDates) {
       final monday = _weekStart(d);
-      final key = '${monday.year}-W${_isoWeekNumber(monday).toString().padLeft(2, '0')}';
+      final key =
+          '${monday.year}-W${_isoWeekNumber(monday).toString().padLeft(2, '0')}';
       breakdown[key] = (breakdown[key] ?? 0) + 1;
     }
     return breakdown;
@@ -180,10 +180,9 @@ class Habit {
   }
 
   String toCsvRow() {
-    final datesStr =
-        _completedDates.map((d) => d.toIso8601String().split('T').first).join(
-              ';',
-            );
+    final datesStr = _completedDates
+        .map((d) => d.toIso8601String().split('T').first)
+        .join(';');
     final escapedName = name.replaceAll('|', '\\p');
     final escapedMsg = notificationMessage.replaceAll('|', '\\p');
     return '$id|$escapedName|${createdAt.toIso8601String().split('T').first}|$color|$datesStr|${reminderEnabled ? 1 : 0}|$reminderHour|$reminderMinute|$escapedMsg|$sortOrder|$goal';
@@ -195,10 +194,10 @@ class Habit {
     try {
       final dates = parts.length > 4 && parts[4].isNotEmpty
           ? parts[4]
-              .split(';')
-              .map((s) => DateTime.tryParse(s.trim()))
-              .whereType<DateTime>()
-              .toList()
+                .split(';')
+                .map((s) => DateTime.tryParse(s.trim()))
+                .whereType<DateTime>()
+                .toList()
           : <DateTime>[];
       final reminderEnabled = parts.length > 5 ? parts[5] == '1' : false;
       final reminderHour = parts.length > 6 ? int.tryParse(parts[6]) ?? 0 : 0;

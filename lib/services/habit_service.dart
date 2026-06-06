@@ -8,7 +8,6 @@ import '../providers/settings_providers.dart';
 class HabitService {
   static const _fileName = 'habits.csv';
 
-  /// May be set by the provider to mirror the project storage path.
   String? customBasePath;
 
   Future<String> get _baseDir async {
@@ -33,14 +32,13 @@ class HabitService {
       final file = await _file;
       if (!await file.exists()) return [];
       final content = await file.readAsString();
-      final lines =
-          content.split('\n').where((l) => l.trim().isNotEmpty).toList();
+      final lines = content
+          .split('\n')
+          .where((l) => l.trim().isNotEmpty)
+          .toList();
       if (lines.isEmpty) return [];
       final dataLines = lines[0].startsWith('id|') ? lines.sublist(1) : lines;
-      return dataLines
-          .map(Habit.fromCsvRow)
-          .whereType<Habit>()
-          .toList();
+      return dataLines.map(Habit.fromCsvRow).whereType<Habit>().toList();
     } catch (_) {
       return [];
     }
@@ -48,9 +46,10 @@ class HabitService {
 
   Future<void> saveHabits(List<Habit> habits) async {
     final file = await _file;
-    // Ensure parent directory exists
     await file.parent.create(recursive: true);
-    final buffer = StringBuffer('id|name|created_at|color|completed_dates|reminder_enabled|reminder_hour|reminder_minute|notification_message|sort_order|goal\n');
+    final buffer = StringBuffer(
+      'id|name|created_at|color|completed_dates|reminder_enabled|reminder_hour|reminder_minute|notification_message|sort_order|goal\n',
+    );
     for (final h in habits) {
       buffer.writeln(h.toCsvRow());
     }
@@ -67,7 +66,9 @@ class HabitService {
     int goal = 0,
   }) async {
     final habits = await loadHabits();
-    final maxOrder = habits.isEmpty ? 0 : habits.map((h) => h.sortOrder).reduce((a, b) => a > b ? a : b);
+    final maxOrder = habits.isEmpty
+        ? 0
+        : habits.map((h) => h.sortOrder).reduce((a, b) => a > b ? a : b);
     final habit = Habit(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       name: name,

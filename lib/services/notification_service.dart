@@ -7,14 +7,6 @@ import '../models/sub_todo.dart';
 import '../models/master_project.dart';
 import 'recurrence_service.dart';
 
-/// Background notification action handler — must be a top-level function so
-/// it can run in a separate isolate when the app is not in the foreground.
-///
-/// For todo notifications (actionId == "done"): writes a pending-completion
-/// entry to a queue file that sits alongside the project .md files.
-/// For habit notifications (payload starts with "habit|||"): writes the
-/// habit id to a habit-queue file so the habit notifier can apply the toggle
-/// on the next app launch.
 @pragma('vm:entry-point')
 Future<void> handleBackgroundNotificationResponse(
   NotificationResponse response,
@@ -22,7 +14,6 @@ Future<void> handleBackgroundNotificationResponse(
   final payload = response.payload;
   if (payload == null) return;
 
-  // ── Habit notification ──────────────────────────────────────────────────
   if (payload.startsWith('habit|||')) {
     if (response.actionId != 'habit_done') return;
     final parts = payload.split('|||');
@@ -32,17 +23,13 @@ Future<void> handleBackgroundNotificationResponse(
     try {
       final dir = await getApplicationDocumentsDirectory();
       final queueFile = File('${dir.path}/.habit_queue');
-      await queueFile.writeAsString(
-        '$habitId\n',
-        mode: FileMode.append,
-      );
+      await queueFile.writeAsString('$habitId\n', mode: FileMode.append);
     } catch (_) {
       // Best-effort I/O
     }
     return;
   }
 
-  // ── Todo notification ───────────────────────────────────────────────────
   if (response.actionId != NotificationService.doneActionId) return;
 
   final sep = payload.indexOf('|||');
@@ -64,21 +51,15 @@ Future<void> handleBackgroundNotificationResponse(
   }
 }
 
-/// Manages Android system-level notifications for sub-todos and projects.
 class NotificationService {
   static const String _remindersChannelId = 'markdone_reminders';
   static const String _instantChannelId = 'markdone_instant';
   static const String _habitChannelId = 'markdone_habit_reminders';
 
-  /// Action ID sent with every notification's "Done!" button.
   static const String doneActionId = 'done';
 
-  /// How many future occurrences to pre-schedule for recurring tasks so that
-  /// notifications keep firing even when the app is not opened.
   static const int _maxRecurringPreSchedule = 10;
 
-  /// Set this from [ProjectsNotifier] so that a foreground "Done!" tap is
-  /// handled immediately without going through the queue file.
   static Future<void> Function(String filePath, String todoId)? onDoneAction;
 
   static final NotificationService _instance = NotificationService._();
@@ -90,7 +71,6 @@ class NotificationService {
 
   bool _initialized = false;
 
-  /// Initialize the notification plugin.
   Future<void> init() async {
     if (_initialized) return;
 
@@ -108,8 +88,6 @@ class NotificationService {
     await _plugin.initialize(
       initSettings,
       onDidReceiveNotificationResponse: _onNotificationTap,
-      // Background isolate handler for action button taps when app is not
-      // in the foreground.
       onDidReceiveBackgroundNotificationResponse:
           handleBackgroundNotificationResponse,
     );
@@ -155,13 +133,10 @@ class NotificationService {
     _initialized = true;
   }
 
-  /// Ensures the service is initialized before any operation.
   Future<void> _ensureInitialized() async {
     if (!_initialized) await init();
   }
 
-  /// Called when the user taps a notification or one of its action buttons
-  /// while the app is in the foreground (or is brought to the foreground).
   void _onNotificationTap(NotificationResponse response) {
     if (response.actionId == doneActionId) {
       final payload = response.payload;
@@ -176,8 +151,6 @@ class NotificationService {
     // Other taps (notification body): no-op for now — reserved for deep-link.
   }
 
-  /// Schedules a notification with exact alarms, falling back to inexact if the
-  /// permission is denied.
   Future<void> _scheduleZonedWithFallback({
     required int id,
     required String title,
@@ -226,7 +199,6 @@ class NotificationService {
     }
   }
 
-  /// Show a debug message as an instantaneous notification.
   Future<void> showDebugNotification(String message) async {
     await _ensureInitialized();
     final debugId = DateTime.now().millisecondsSinceEpoch.remainder(100000);
@@ -246,11 +218,6 @@ class NotificationService {
     );
   }
 
-  /// Schedules the main alarm notification(s) for a sub-todo.
-  ///
-  /// For recurring tasks, up to [_maxRecurringPreSchedule] future occurrences
-  /// are pre-scheduled so that notifications keep firing even when the app is
-  /// not opened between occurrences.
   Future<void> scheduleSubTodoAlarm({
     required SubTodo todo,
     required String projectTitle,
@@ -274,7 +241,6 @@ class NotificationService {
     ];
 
     if (!todo.isRecurring) {
-      // Non-recurring: one notification at the alarm time.
       final scheduledDate = tz.TZDateTime.from(todo.alarm!, tz.local);
       if (scheduledDate.isBefore(now)) return;
       await _scheduleZonedWithFallback(
@@ -288,8 +254,6 @@ class NotificationService {
       return;
     }
 
-    // Recurring: pre-schedule the next N occurrences so notifications fire
-    // even if the app is never opened between recurrences.
     DateTime currentAlarm = todo.alarm!;
     int scheduledCount = 0;
     int maxIter =
@@ -320,7 +284,6 @@ class NotificationService {
     }
   }
 
-  /// Schedules a heads-up reminder notification (alarm − reminderBefore).
   Future<void> scheduleSubTodoReminder({
     required SubTodo todo,
     required String projectTitle,
@@ -357,22 +320,18 @@ class NotificationService {
     );
   }
 
-  /// Cancels all notifications for a sub-todo, including any pre-scheduled
-  /// recurring occurrences.
   Future<void> cancelSubTodoNotifications(SubTodo todo) async {
     await _ensureInitialized();
 
     final baseAlarmId = todo.id.hashCode.abs() % 2147483647;
     final reminderId = (todo.id.hashCode.abs() + 1000000) % 2147483647;
 
-    // Cancel the base alarm and all pre-scheduled recurring occurrences.
     for (int i = 0; i < _maxRecurringPreSchedule; i++) {
       await _plugin.cancel((baseAlarmId + i) % 2147483647);
     }
     await _plugin.cancel(reminderId);
   }
 
-  /// Reschedules all notifications for a project.
   Future<void> rescheduleProjectNotifications(MasterProject project) async {
     await _ensureInitialized();
 
@@ -394,7 +353,6 @@ class NotificationService {
     }
   }
 
-  /// Schedules a daily habit reminder notification.
   Future<void> scheduleHabitReminder({
     required String habitId,
     required String habitName,
@@ -471,20 +429,17 @@ class NotificationService {
     }
   }
 
-  /// Cancels the daily reminder for a habit.
   Future<void> cancelHabitReminder(String habitId) async {
     await _ensureInitialized();
     final id = (habitId.hashCode.abs() + 2000000) % 2147483647;
     await _plugin.cancel(id);
   }
 
-  /// Cancels all pending notifications.
   Future<void> cancelAll() async {
     await _ensureInitialized();
     await _plugin.cancelAll();
   }
 
-  /// Show an immediate notification (for testing / debugging).
   Future<void> showInstant({
     required String title,
     required String body,
@@ -507,7 +462,6 @@ class NotificationService {
     );
   }
 
-  /// Returns all pending notification requests (for debugging).
   Future<List<PendingNotificationRequest>> getPendingNotifications() async {
     await _ensureInitialized();
     return _plugin.pendingNotificationRequests();

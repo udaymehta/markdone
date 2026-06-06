@@ -1,6 +1,9 @@
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
+/// Top-level UUID generator to avoid mutable static in @immutable class.
+final _uuid = Uuid();
+
 enum RecurrenceFrequency { minutely, hourly, daily, weekly, monthly, yearly }
 
 enum ReminderUnit { minutes, hours, days, weeks }
@@ -287,17 +290,8 @@ class RecurrenceRule {
   int get hashCode => Object.hash(frequency, interval, anchorDay, anchorMonth);
 }
 
-/// Represents a single sub-todo (checkbox item) within a master project.
-///
-/// In the `.md` file, a sub-todo looks like:
-/// ```
-/// - [ ] Buy groceries <!-- {"id":"todo-1","alarm":"2026-03-10T09:00:00","calendarId":"abc123","reminder":"30m","recurrence":{"frequency":"weekly"}} -->
-/// - [x] Clean kitchen <!-- {"id":"todo-2","alarm":"2026-03-05T08:00:00"} -->
-/// ```
 @immutable
 class SubTodo {
-  static final Uuid _uuid = Uuid();
-
   final String id;
   final String title;
   final bool isCompleted;
@@ -382,7 +376,6 @@ class SubTodo {
     return copyWith(recurrence: normalizedRule);
   }
 
-  /// Converts reminder duration to a short string like "30m", "1h", "1d".
   String? get reminderString {
     return ReminderConfig.fromDuration(reminderBefore)?.compact;
   }
@@ -390,12 +383,10 @@ class SubTodo {
   String? get reminderLabel =>
       ReminderConfig.fromDuration(reminderBefore)?.label;
 
-  /// Parses a reminder string like "30m", "1h", "1d" into a Duration.
   static Duration? parseReminderString(String? value) {
     return ReminderConfig.fromString(value)?.duration;
   }
 
-  /// Builds the hidden HTML comment metadata JSON string.
   Map<String, dynamic> toMetadataMap() {
     final map = <String, dynamic>{'id': id};
     if (alarm != null) map['alarm'] = alarm!.toIso8601String();

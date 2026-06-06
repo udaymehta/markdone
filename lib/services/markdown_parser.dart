@@ -3,10 +3,7 @@ import 'package:yaml/yaml.dart';
 import '../models/master_project.dart';
 import '../models/sub_todo.dart';
 
-/// Parses and serializes `.md` files with YAML frontmatter and
-/// inline HTML-comment metadata for sub-todos.
 class MarkdownParser {
-  // Regex patterns
   static final _frontmatterRegex = RegExp(
     r'^---\s*\n([\s\S]*?)\n---\s*\n?',
     multiLine: true,
@@ -16,9 +13,7 @@ class MarkdownParser {
 
   static final _metadataCommentRegex = RegExp(r'<!--\s*(\{.*?\})\s*-->');
 
-  /// Parses a full `.md` file string into a [MasterProject].
   static MasterProject parse(String content, String filePath) {
-    // --- Extract frontmatter ---
     String frontmatterRaw = '';
     String body = content;
 
@@ -28,7 +23,6 @@ class MarkdownParser {
       body = content.substring(fmMatch.end);
     }
 
-    // Parse YAML
     Map<String, dynamic> frontmatter = {};
     if (frontmatterRaw.isNotEmpty) {
       try {
@@ -51,7 +45,6 @@ class MarkdownParser {
     final description = frontmatter['description']?.toString();
     final syncWithCalendar = frontmatter['sync_calendar'] == true;
 
-    // --- Parse sub-todos from body ---
     final lines = body.split('\n');
     final todos = <SubTodo>[];
 
@@ -63,7 +56,6 @@ class MarkdownParser {
         final isCompleted = checkChar == 'x' || checkChar == 'X';
         String rawTitle = match.group(3)!.trim();
 
-        // Extract hidden metadata comment
         String? persistentId;
         DateTime? alarm;
         var syncToCalendar = true;
@@ -74,7 +66,6 @@ class MarkdownParser {
 
         final metaMatch = _metadataCommentRegex.firstMatch(rawTitle);
         if (metaMatch != null) {
-          // Remove the comment from the display title
           rawTitle = rawTitle.replaceAll(_metadataCommentRegex, '').trim();
           try {
             final metaJson =
@@ -146,11 +137,9 @@ class MarkdownParser {
     );
   }
 
-  /// Serializes a [MasterProject] back to a `.md` file string.
   static String serialize(MasterProject project) {
     final buffer = StringBuffer();
 
-    // --- Write frontmatter ---
     buffer.writeln('---');
     final fm = project.toFrontmatterMap();
     for (final entry in fm.entries) {
@@ -244,12 +233,9 @@ class MarkdownParser {
     return buffer.toString();
   }
 
-  /// Strips metadata comments from a line, returning clean display text.
   static String stripMetadata(String line) {
     return line.replaceAll(_metadataCommentRegex, '').trim();
   }
-
-  // --- Private helpers ---
 
   static Map<String, dynamic> _yamlMapToMap(YamlMap yaml) {
     final map = <String, dynamic>{};

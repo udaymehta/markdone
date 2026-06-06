@@ -5,14 +5,12 @@ import 'package:path/path.dart' as p;
 import '../models/master_project.dart';
 import 'markdown_parser.dart';
 
-/// Handles all file system operations for `.md` project files.
 class FileService {
   static const String _mdExtension = '.md';
   static const String _archiveFolderName = 'archive';
   static const String _defaultFolderName = 'markdone';
   String? _cachedBasePath;
 
-  /// Allows overriding the base path (from user settings).
   String? customBasePath;
 
   void _log(String message) {
@@ -53,8 +51,6 @@ class FileService {
     return null;
   }
 
-  /// Returns the base directory where `.md` files are stored.
-  /// Priority: customBasePath > external storage > app documents.
   Future<String> get basePath async {
     // If user has set a custom path, always use that
     if (customBasePath != null && customBasePath!.isNotEmpty) {
@@ -96,10 +92,8 @@ class FileService {
     return _cachedBasePath!;
   }
 
-  /// Returns the active storage path currently used by the app.
   Future<String> get effectiveStoragePath async => basePath;
 
-  /// Returns the archive directory where archived `.md` files are stored.
   Future<String> get archivePath async {
     final archiveDir = Directory(p.join(await basePath, _archiveFolderName));
     if (!await archiveDir.exists()) {
@@ -108,7 +102,6 @@ class FileService {
     return archiveDir.path;
   }
 
-  /// Lists all `.md` files in the base directory.
   Future<List<File>> listMarkdownFiles({bool archived = false}) async {
     final dir = Directory(await (archived ? archivePath : basePath));
     if (!await dir.exists()) return [];
@@ -119,48 +112,47 @@ class FileService {
         .cast<File>()
         .toList();
 
-    // Sort by last modified, newest first
+    final stats = await Future.wait(files.map((f) => f.stat()));
+    final fileStats = Map.fromIterables(files, stats);
     files.sort((a, b) {
-      final aStat = a.statSync();
-      final bStat = b.statSync();
+      final aStat = fileStats[a]!;
+      final bStat = fileStats[b]!;
       return bStat.modified.compareTo(aStat.modified);
     });
 
     return files;
   }
 
-  /// Reads and parses a single `.md` file into a [MasterProject].
   Future<MasterProject> readProject(String filePath) async {
     final file = File(filePath);
     final content = await file.readAsString();
     return MarkdownParser.parse(content, filePath);
   }
 
-  /// Reads and parses all `.md` files into [MasterProject] objects.
   Future<List<MasterProject>> readAllProjects({bool archived = false}) async {
     final files = await listMarkdownFiles(archived: archived);
     final projects = <MasterProject>[];
 
-    for (final file in files) {
-      try {
-        final project = await readProject(file.path);
-        projects.add(project);
-      } catch (e) {
-        _log('Error parsing ${file.path}: $e');
-      }
-    }
+    await Future.wait(
+      files.map((file) async {
+        try {
+          final project = await readProject(file.path);
+          projects.add(project);
+        } catch (e) {
+          _log('Error parsing ${file.path}: $e');
+        }
+      }),
+    );
 
     return projects;
   }
 
-  /// Writes a [MasterProject] to its `.md` file.
   Future<void> writeProject(MasterProject project) async {
     final content = MarkdownParser.serialize(project);
     final file = File(project.filePath);
     await file.writeAsString(content);
   }
 
-  /// Creates a new `.md` file with default frontmatter.
   Future<MasterProject> createProject({
     required String title,
     DateTime? dday,
@@ -200,7 +192,6 @@ class FileService {
     return project;
   }
 
-  /// Deletes a project's `.md` file.
   Future<void> deleteProject(String filePath) async {
     final file = File(filePath);
     if (!await file.exists()) {
@@ -218,7 +209,6 @@ class FileService {
     }
   }
 
-  /// Moves a project file into the archive folder.
   Future<String> archiveProject(String filePath) async {
     final file = File(filePath);
     if (!await file.exists()) return filePath;
@@ -238,7 +228,6 @@ class FileService {
     return destinationPath;
   }
 
-  /// Moves an archived project file back to the active projects folder.
   Future<String> restoreProject(String filePath) async {
     final file = File(filePath);
     if (!await file.exists()) return filePath;
@@ -258,7 +247,6 @@ class FileService {
     return destinationPath;
   }
 
-  /// Watches the base directory for changes (external edits).
   Stream<FileSystemEvent> watchDirectory() async* {
     final dir = Directory(await basePath);
     if (await dir.exists()) {
@@ -266,7 +254,6 @@ class FileService {
     }
   }
 
-  /// Watches the archive directory for changes (external edits).
   Stream<FileSystemEvent> watchArchiveDirectory() async* {
     final dir = Directory(await archivePath);
     if (await dir.exists()) {
