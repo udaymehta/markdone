@@ -13,7 +13,7 @@ class ThemeModeNotifier extends Notifier<ThemeMode> {
   ThemeMode build() {
     final settings = ref.read(settingsServiceProvider);
     return ThemeMode.values.asNameMap()[settings.getThemeMode()] ??
-        ThemeMode.dark;
+        ThemeMode.light;
   }
 
   void toggle() {

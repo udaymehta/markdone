@@ -59,88 +59,89 @@ Future<Color?> showAccentColorPicker(
         ).toColor();
 
         return AlertDialog(
+          scrollable: true,
           title: const Text('Accent Color'),
           contentPadding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
           content: SizedBox(
             width: 300,
             child: Column(
               mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: currentColor,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: theme.colorScheme.onSurfaceVariant.withValues(
-                        alpha: 0.2,
+                children: [
+                  Container(
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: currentColor,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: theme.colorScheme.onSurfaceVariant.withValues(
+                          alpha: 0.2,
+                        ),
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 16),
-                _HueBar(
-                  hue: hue,
-                  onChanged: (v) => setPickerState(() => hue = v),
-                ),
-                const SizedBox(height: 12),
-                _SaturationLightnessPicker(
-                  hue: hue,
-                  saturation: saturation,
-                  lightness: lightness,
-                  onChanged: (s, l) => setPickerState(() {
-                    saturation = s;
-                    lightness = l;
-                  }),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Icon(
-                      Icons.tag_rounded,
-                      size: 16,
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                    const SizedBox(width: 6),
-                    SizedBox(
-                      width: 120,
-                      child: TextField(
-                        controller: hexController,
-                        decoration: const InputDecoration(
-                          isDense: true,
-                          hintText: '#RRGGBB',
-                          contentPadding: EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 8,
+                  const SizedBox(height: 16),
+                  _HueBar(
+                    hue: hue,
+                    onChanged: (v) => setPickerState(() => hue = v),
+                  ),
+                  const SizedBox(height: 12),
+                  _SaturationLightnessPicker(
+                    hue: hue,
+                    saturation: saturation,
+                    lightness: lightness,
+                    onChanged: (s, l) => setPickerState(() {
+                      saturation = s;
+                      lightness = l;
+                    }),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.tag_rounded,
+                        size: 16,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 6),
+                      SizedBox(
+                        width: 120,
+                        child: TextField(
+                          controller: hexController,
+                          decoration: const InputDecoration(
+                            isDense: true,
+                            hintText: '#RRGGBB',
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 8,
+                            ),
                           ),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontFamily: 'monospace',
+                          ),
+                          textCapitalization: TextCapitalization.characters,
+                          onChanged: (value) {
+                            final parsed = parseBgColor(value);
+                            if (parsed != null) {
+                              final hsl = HSLColor.fromColor(parsed);
+                              setPickerState(() {
+                                hue = hsl.hue;
+                                saturation = hsl.saturation;
+                                lightness = hsl.lightness;
+                              });
+                            }
+                          },
                         ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        colorToHexString(currentColor),
                         style: theme.textTheme.bodySmall?.copyWith(
                           fontFamily: 'monospace',
+                          fontWeight: FontWeight.w600,
                         ),
-                        textCapitalization: TextCapitalization.characters,
-                        onChanged: (value) {
-                          final parsed = parseBgColor(value);
-                          if (parsed != null) {
-                            final hsl = HSLColor.fromColor(parsed);
-                            setPickerState(() {
-                              hue = hsl.hue;
-                              saturation = hsl.saturation;
-                              lightness = hsl.lightness;
-                            });
-                          }
-                        },
                       ),
-                    ),
-                    const Spacer(),
-                    Text(
-                      colorToHexString(currentColor),
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        fontFamily: 'monospace',
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
                 const SizedBox(height: 8),
               ],
             ),
