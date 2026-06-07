@@ -36,6 +36,10 @@ Future<void> main() async {
   final notifService = NotificationService();
   await notifService.init();
 
+  // Cancel ALL stale notifications from previous sessions.
+  // Providers will reschedule valid ones during their build() call.
+  await notifService.cancelAll();
+
   await requestStartupPermissions();
 
   runApp(

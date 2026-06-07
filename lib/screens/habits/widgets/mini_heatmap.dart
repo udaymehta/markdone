@@ -14,6 +14,9 @@ class MiniHeatmap extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Watch the periodic time provider so the heatmap rebuilds on day changes
+    ref.watch(nowProvider);
+
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final color = parseHexColor(habit.color);

@@ -1,10 +1,21 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/habit.dart';
 import '../services/habit_service.dart';
+import '../services/notification_service.dart';
 import 'project_providers.dart';
 import 'settings_providers.dart';
+
+/// Emits the current [DateTime] every 30 seconds so widgets that depend on
+/// wall-clock time (heatmaps, day headers) rebuild automatically.
+final nowProvider = StreamProvider.autoDispose<DateTime>((ref) async* {
+  yield DateTime.now();
+  await for (final _ in Stream.periodic(const Duration(seconds: 30))) {
+    yield DateTime.now();
+  }
+});
 
 final habitListProvider = AsyncNotifierProvider<HabitListNotifier, List<Habit>>(
   HabitListNotifier.new,
@@ -23,7 +34,12 @@ class HabitListNotifier extends AsyncNotifier<List<Habit>> {
 
     final habits = await service.loadHabits();
 
+    // Wire foreground "Done" button for habit notifications
+    NotificationService.onHabitDoneAction = _handleForegroundHabitDone;
+
+    // Cancel stale + reschedule enabled habit reminders
     for (final h in habits) {
+      notifService.cancelHabitReminder(h.id);
       if (h.reminderEnabled) {
         notifService.scheduleHabitReminder(
           habitId: h.id,
@@ -36,6 +52,20 @@ class HabitListNotifier extends AsyncNotifier<List<Habit>> {
     }
 
     return habits;
+  }
+
+  Future<void> _handleForegroundHabitDone(String habitId) async {
+    final service = ref.read(habitServiceProvider);
+    final now = DateTime.now();
+    final today = DateTime.utc(now.year, now.month, now.day);
+    try {
+      final updated = await service.toggleDate(habitId, today);
+      final current = state.asData?.value;
+      if (current == null) return;
+      state = AsyncData(
+        current.map((h) => h.id == habitId ? updated : h).toList(),
+      );
+    } catch (_) {}
   }
 
   Future<void> _processHabitQueue(HabitService service) async {

@@ -57,10 +57,13 @@ class NotificationService {
   static const String _habitChannelId = 'markdone_habit_reminders';
 
   static const String doneActionId = 'done';
+  static const String habitDoneActionId = 'habit_done';
+  static const String habitNotDoneActionId = 'habit_not_done';
 
   static const int _maxRecurringPreSchedule = 10;
 
   static Future<void> Function(String filePath, String todoId)? onDoneAction;
+  static Future<void> Function(String habitId)? onHabitDoneAction;
 
   static final NotificationService _instance = NotificationService._();
   factory NotificationService() => _instance;
@@ -138,9 +141,20 @@ class NotificationService {
   }
 
   void _onNotificationTap(NotificationResponse response) {
+    final payload = response.payload;
+    if (payload == null) return;
+
+    if (payload.startsWith('habit|||')) {
+      if (response.actionId == habitDoneActionId) {
+        final parts = payload.split('|||');
+        if (parts.length >= 2) {
+          onHabitDoneAction?.call(parts[1]);
+        }
+      }
+      return;
+    }
+
     if (response.actionId == doneActionId) {
-      final payload = response.payload;
-      if (payload == null) return;
       final sep = payload.indexOf('|||');
       if (sep < 0) return;
       final filePath = payload.substring(0, sep);

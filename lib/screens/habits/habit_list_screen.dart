@@ -151,6 +151,7 @@ class _HabitListView extends ConsumerStatefulWidget {
 class _HabitListViewState extends ConsumerState<_HabitListView> {
   @override
   Widget build(BuildContext context) {
+    ref.watch(nowProvider);
     final theme = Theme.of(context);
 
     return Column(
