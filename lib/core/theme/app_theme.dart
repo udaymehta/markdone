@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 class AppColors {
   AppColors._();
 
-  static const Color accent = Color(0xFFFF6B35);
-  static const Color accentLight = Color(0xFFFF9A6C);
-  static const Color accentDark = Color(0xFFD94F1E);
+  static const Color accent = Color(0xFF2B78ED);
+  static const Color accentLight = Color(0xFF6BA3F3);
+  static const Color accentDark = Color(0xFF1E5BC4);
 
   static const Color darkSurface = Color(0xFF242424);
   static const Color darkSurfaceVariant = Color(0xFF2C2C2C);
@@ -135,6 +135,27 @@ class AppTheme {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         behavior: SnackBarBehavior.floating,
       ),
+      timePickerTheme: TimePickerThemeData(
+        hourMinuteColor: WidgetStateColor.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) return accent;
+          return Colors.transparent;
+        }),
+        hourMinuteTextColor: WidgetStateColor.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) return Colors.white;
+          return AppColors.darkText;
+        }),
+        dayPeriodColor: WidgetStateColor.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) return accent;
+          return Colors.transparent;
+        }),
+        dayPeriodTextColor: WidgetStateColor.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) return Colors.white;
+          return AppColors.darkText;
+        }),
+        dialHandColor: accent,
+        dialTextColor: AppColors.darkText,
+        entryModeIconColor: accent,
+      ),
     );
   }
 
@@ -220,6 +241,27 @@ class AppTheme {
         contentTextStyle: const TextStyle(color: AppColors.lightText),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         behavior: SnackBarBehavior.floating,
+      ),
+      timePickerTheme: TimePickerThemeData(
+        hourMinuteColor: WidgetStateColor.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) return accent;
+          return Colors.transparent;
+        }),
+        hourMinuteTextColor: WidgetStateColor.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) return Colors.white;
+          return AppColors.lightText;
+        }),
+        dayPeriodColor: WidgetStateColor.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) return accent;
+          return Colors.transparent;
+        }),
+        dayPeriodTextColor: WidgetStateColor.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) return Colors.white;
+          return AppColors.lightText;
+        }),
+        dialHandColor: accent,
+        dialTextColor: AppColors.lightText,
+        entryModeIconColor: accent,
       ),
     );
   }
