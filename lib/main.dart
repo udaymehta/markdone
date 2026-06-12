@@ -4,9 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:workmanager/workmanager.dart';
 import 'app.dart';
 import 'providers/settings_providers.dart';
 import 'services/notification_service.dart';
+import 'services/ota_background_service.dart';
+
 
 Future<void> requestStartupPermissions() async {
   if (!Platform.isAndroid) return;
@@ -41,6 +44,15 @@ Future<void> main() async {
   await notifService.cancelAll();
 
   await requestStartupPermissions();
+
+  await Workmanager().initialize(otaBackgroundCallback);
+  await Workmanager().registerPeriodicTask(
+    'ota_update_check',
+    'otaCheck',
+    frequency: const Duration(hours: 12),
+    constraints: Constraints(networkType: NetworkType.connected),
+    existingWorkPolicy: ExistingPeriodicWorkPolicy.keep,
+  );
 
   runApp(
     ProviderScope(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/date_formatters.dart';
+import 'core/ota_payload_handler.dart';
 import 'core/theme/app_theme.dart';
 import 'providers/theme_provider.dart';
 import 'screens/main_shell.dart';
@@ -33,7 +34,28 @@ class MarkDoneApp extends ConsumerWidget {
           child: child!,
         );
       },
-      home: const MainShell(),
+      home: const _OtaAwareHome(),
     );
+  }
+}
+
+class _OtaAwareHome extends StatefulWidget {
+  const _OtaAwareHome();
+  @override
+  State<_OtaAwareHome> createState() => _OtaAwareHomeState();
+}
+
+class _OtaAwareHomeState extends State<_OtaAwareHome> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      OtaPayloadHandler.handlePendingUpdate(context);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return const MainShell();
   }
 }

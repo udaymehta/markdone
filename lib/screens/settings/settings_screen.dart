@@ -12,6 +12,7 @@ import '../../providers/settings_providers.dart';
 import '../../providers/project_providers.dart';
 import '../../providers/theme_provider.dart';
 import '../../services/calendar_service.dart';
+import 'widgets/ota_update_dialog.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -283,6 +284,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             _SectionHeader(title: 'Permissions'),
             ..._buildPermissionTiles(permissionEntries),
           ],
+
+          const Divider(height: 32, indent: 16, endIndent: 16),
+
+          _SectionHeader(title: 'Updates'),
+          _SettingsTile(
+            icon: Icons.system_update_outlined,
+            title: 'Check for Updates',
+            subtitle: 'Tap to check GitHub for new releases',
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: () => showOtaUpdateDialog(context),
+          ),
 
           const Divider(height: 32, indent: 16, endIndent: 16),
 
