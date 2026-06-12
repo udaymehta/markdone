@@ -19,11 +19,13 @@ Future<void> handleBackgroundNotificationResponse(
     final parts = payload.split('|||');
     if (parts.length < 2) return;
     final habitId = parts[1];
+    final dateStr = parts.length >= 3 ? parts[2] : null;
 
     try {
       final dir = await getApplicationDocumentsDirectory();
       final queueFile = File('${dir.path}/.habit_queue');
-      await queueFile.writeAsString('$habitId\n', mode: FileMode.append);
+      final line = dateStr != null ? '$habitId|||$dateStr\n' : '$habitId\n';
+      await queueFile.writeAsString(line, mode: FileMode.append);
     } catch (_) {
       // Best-effort I/O
     }
@@ -63,7 +65,8 @@ class NotificationService {
   static const int _maxRecurringPreSchedule = 10;
 
   static Future<void> Function(String filePath, String todoId)? onDoneAction;
-  static Future<void> Function(String habitId)? onHabitDoneAction;
+  static Future<void> Function(String habitId, [String? notificationDate])?
+      onHabitDoneAction;
 
   static final NotificationService _instance = NotificationService._();
   factory NotificationService() => _instance;
@@ -148,7 +151,8 @@ class NotificationService {
       if (response.actionId == habitDoneActionId) {
         final parts = payload.split('|||');
         if (parts.length >= 2) {
-          onHabitDoneAction?.call(parts[1]);
+          final dateStr = parts.length >= 3 ? parts[2] : null;
+          onHabitDoneAction?.call(parts[1], dateStr);
         }
       }
       return;
@@ -376,21 +380,21 @@ class NotificationService {
   }) async {
     await _ensureInitialized();
 
-    final now = tz.TZDateTime.now(tz.local);
-    var scheduledDate = tz.TZDateTime(
+    final nowLocal = DateTime.now();
+    var intendedDate = DateTime.utc(nowLocal.year, nowLocal.month, nowLocal.day);
+    var scheduledDate = tz.TZDateTime.from(
+      DateTime(nowLocal.year, nowLocal.month, nowLocal.day, hour, minute),
       tz.local,
-      now.year,
-      now.month,
-      now.day,
-      hour,
-      minute,
     );
-    if (scheduledDate.isBefore(now)) {
+    if (scheduledDate.isBefore(tz.TZDateTime.from(nowLocal, tz.local))) {
       scheduledDate = scheduledDate.add(const Duration(days: 1));
+      intendedDate = intendedDate.add(const Duration(days: 1));
     }
 
     final id = (habitId.hashCode.abs() + 2000000) % 2147483647;
-    final payload = 'habit|||$habitId';
+    final dateStr =
+        '${intendedDate.year}-${intendedDate.month.toString().padLeft(2, '0')}-${intendedDate.day.toString().padLeft(2, '0')}';
+    final payload = 'habit|||$habitId|||$dateStr';
 
     const details = NotificationDetails(
       android: AndroidNotificationDetails(

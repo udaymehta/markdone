@@ -54,12 +54,14 @@ class HabitListNotifier extends AsyncNotifier<List<Habit>> {
     return habits;
   }
 
-  Future<void> _handleForegroundHabitDone(String habitId) async {
+  Future<void> _handleForegroundHabitDone(
+    String habitId,
+    [String? notificationDate,
+  ]) async {
     final service = ref.read(habitServiceProvider);
-    final now = DateTime.now();
-    final today = DateTime.utc(now.year, now.month, now.day);
+    final date = _parseDateOrToday(notificationDate);
     try {
-      final updated = await service.toggleDate(habitId, today);
+      final updated = await service.toggleDate(habitId, date);
       final current = state.asData?.value;
       if (current == null) return;
       state = AsyncData(
@@ -83,15 +85,32 @@ class HabitListNotifier extends AsyncNotifier<List<Habit>> {
 
       await queueFile.delete();
 
-      final now = DateTime.now();
-      final today = DateTime.utc(now.year, now.month, now.day);
-
-      for (final habitId in lines) {
+      for (final line in lines) {
         try {
-          await service.toggleDate(habitId.trim(), today);
+          final parts = line.trim().split('|||');
+          final habitId = parts[0];
+          final dateStr = parts.length >= 2 ? parts[1] : null;
+          final date = _parseDateOrToday(dateStr);
+          await service.toggleDate(habitId, date);
         } catch (_) {}
       }
     } catch (_) {}
+  }
+
+  static DateTime _parseDateOrToday(String? dateStr) {
+    if (dateStr != null) {
+      final parts = dateStr.split('-');
+      if (parts.length == 3) {
+        final y = int.tryParse(parts[0]);
+        final m = int.tryParse(parts[1]);
+        final d = int.tryParse(parts[2]);
+        if (y != null && m != null && d != null) {
+          return DateTime.utc(y, m, d);
+        }
+      }
+    }
+    final now = DateTime.now();
+    return DateTime.utc(now.year, now.month, now.day);
   }
 
   Future<void> addHabit(
