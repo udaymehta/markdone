@@ -163,6 +163,62 @@ void main() {
         expect(await queueFile.exists(), true);
       });
 
+      test('habit_done with date in payload writes ID and date to queue',
+          () async {
+        final docsDir = Directory('${tempDir.path}/app_docs_date')
+          ..createSync();
+        PathProviderPlatform.instance = FakePathProvider(
+          documentsPath: docsDir.path,
+        );
+
+        await handleBackgroundNotificationResponse(
+          const NotificationResponse(
+            notificationResponseType:
+                NotificationResponseType.selectedNotificationAction,
+            actionId: 'habit_done',
+            payload: 'habit|||habit-date-123|||2026-06-12',
+          ),
+        );
+
+        final queueFile = File('${docsDir.path}/.habit_queue');
+        expect(await queueFile.exists(), true);
+        final content = await queueFile.readAsString();
+        expect(content, 'habit-date-123|||2026-06-12\n');
+      });
+
+      test('habit payload with date and old format both work (backward compat)',
+          () async {
+        final docsDir = Directory('${tempDir.path}/app_docs_compat')
+          ..createSync();
+        PathProviderPlatform.instance = FakePathProvider(
+          documentsPath: docsDir.path,
+        );
+
+        // New format with date
+        await handleBackgroundNotificationResponse(
+          const NotificationResponse(
+            notificationResponseType:
+                NotificationResponseType.selectedNotificationAction,
+            actionId: 'habit_done',
+            payload: 'habit|||with-date|||2026-06-12',
+          ),
+        );
+
+        // Old format without date
+        await handleBackgroundNotificationResponse(
+          const NotificationResponse(
+            notificationResponseType:
+                NotificationResponseType.selectedNotificationAction,
+            actionId: 'habit_done',
+            payload: 'habit|||no-date',
+          ),
+        );
+
+        final queueFile = File('${docsDir.path}/.habit_queue');
+        final content = await queueFile.readAsString();
+        expect(content, 'with-date|||2026-06-12\nno-date\n');
+      });
+
       test('multiple habit done actions append to same queue', () async {
         final docsDir = Directory('${tempDir.path}/app_docs5')..createSync();
         PathProviderPlatform.instance = FakePathProvider(

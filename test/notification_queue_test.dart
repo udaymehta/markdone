@@ -161,6 +161,33 @@ void main() {
       expect(lines, ['habit-1', 'habit-2', 'habit-3']);
     });
 
+    test('queue supports habit|||date format', () async {
+      final queueFile = File('${tempDir.path}/.habit_queue');
+      await queueFile.writeAsString(
+        'habit-1|||2026-06-12\nhabit-2|||2026-06-13\n',
+      );
+
+      final content = await queueFile.readAsString();
+      final lines = content
+          .trim()
+          .split('\n')
+          .map((l) => l.trim())
+          .where((l) => l.isNotEmpty)
+          .toList();
+      expect(lines.length, 2);
+      expect(lines[0], 'habit-1|||2026-06-12');
+      expect(lines[1], 'habit-2|||2026-06-13');
+
+      // Verify parsing
+      final parts1 = lines[0].split('|||');
+      expect(parts1[0], 'habit-1');
+      expect(parts1[1], '2026-06-12');
+
+      final parts2 = lines[1].split('|||');
+      expect(parts2[0], 'habit-2');
+      expect(parts2[1], '2026-06-13');
+    });
+
     test('dedup removes duplicate habit IDs', () async {
       final queueFile = File('${tempDir.path}/.habit_queue');
       await queueFile.writeAsString('habit-1\nhabit-2\nhabit-1\nhabit-3\n');
@@ -175,6 +202,24 @@ void main() {
       expect(lines, contains('habit-1'));
       expect(lines, contains('habit-2'));
       expect(lines, contains('habit-3'));
+    });
+
+    test('dedup handles mixed old and new format entries', () async {
+      final queueFile = File('${tempDir.path}/.habit_queue');
+      await queueFile.writeAsString(
+        'habit-1|||2026-06-12\nhabit-1\nhabit-1|||2026-06-12\n',
+      );
+
+      final content = await queueFile.readAsString();
+      final lines = content
+          .split('\n')
+          .where((l) => l.trim().isNotEmpty)
+          .toSet()
+          .toList();
+      // habit-1|||2026-06-12 appears twice (dedup), habit-1 appears once
+      expect(lines.length, 2);
+      expect(lines, contains('habit-1|||2026-06-12'));
+      expect(lines, contains('habit-1'));
     });
 
     test('file is deleted after processing', () async {
