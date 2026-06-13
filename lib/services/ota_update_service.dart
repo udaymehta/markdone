@@ -117,13 +117,20 @@ class OtaUpdateService {
 
   static Future<String> downloadApk({
     required String url,
+    required String version,
     required void Function(double fraction) onProgress,
   }) async {
+    final dir = Directory('${(await getApplicationDocumentsDirectory()).path}/ota');
+    if (!await dir.exists()) await dir.create(recursive: true);
+    final file = File('${dir.path}/markdone_v$version.apk');
+
+    if (await file.exists()) return file.path;
+
+    _cleanupOldApks(dir, version);
+
     final request = http.Request('GET', Uri.parse(url));
     final response = await http.Client().send(request);
     final total = response.contentLength ?? -1;
-    final dir = await getTemporaryDirectory();
-    final file = File('${dir.path}/markdone_update.apk');
 
     var received = 0;
     final sink = file.openWrite();
@@ -140,6 +147,19 @@ class OtaUpdateService {
       rethrow;
     }
     return file.path;
+  }
+
+  static Future<void> _cleanupOldApks(Directory dir, String currentVersion) async {
+    try {
+      await for (final entity in dir.list()) {
+        if (entity is File && entity.path.endsWith('.apk')) {
+          final name = entity.uri.pathSegments.last;
+          if (!name.contains('_v$currentVersion.')) {
+            await entity.delete();
+          }
+        }
+      }
+    } catch (_) {}
   }
 
   static Future<String> _detectAbi() async {
@@ -159,4 +179,9 @@ class OtaUpdateService {
 
   static bool isVersionNewer(String latestTag, String currentVersion) =>
       _isNewerVersion(latestTag, currentVersion);
+
+  static Future<String> getCurrentVersion() async {
+    final pkg = await PackageInfo.fromPlatform();
+    return pkg.version;
+  }
 }

@@ -230,7 +230,7 @@ class _HabitListViewState extends ConsumerState<_HabitListView> {
                                     crossAxisAlignment:
                                         CrossAxisAlignment.center,
                                     children: [
-                                      Flexible(
+                                      Expanded(
                                         child: Text(
                                           habit.name,
                                           style: theme.textTheme.bodyLarge

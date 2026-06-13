@@ -3,7 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/color_utils.dart';
 import '../../core/widgets/centered_popup.dart';
@@ -12,6 +14,7 @@ import '../../providers/settings_providers.dart';
 import '../../providers/project_providers.dart';
 import '../../providers/theme_provider.dart';
 import '../../services/calendar_service.dart';
+import '../../services/ota_update_service.dart';
 import 'widgets/ota_update_dialog.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -28,10 +31,35 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   bool _permissionsChecked = false;
   Map<Permission, PermissionStatus> _permissionStatuses = {};
+  String _currentVersion = '';
+  String? _latestVersion;
+  bool _otaCheckDone = false;
+
   @override
   void initState() {
     super.initState();
     _checkPermissions();
+    _initOtaInfo();
+  }
+
+  Future<void> _initOtaInfo() async {
+    try {
+      final pkg = await PackageInfo.fromPlatform();
+      _currentVersion = pkg.version;
+    } catch (_) {}
+
+    final prefs = await SharedPreferences.getInstance();
+    final dismissed = prefs.getString('ota_dismissed_version');
+
+    final result = await OtaUpdateService.checkForUpdate();
+    if (mounted) {
+      setState(() {
+        if (result is OtaUpdateAvailable && result.latestVersion != dismissed) {
+          _latestVersion = result.latestVersion;
+        }
+        _otaCheckDone = true;
+      });
+    }
   }
 
   Future<void> _checkPermissions() async {
@@ -289,10 +317,27 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
           _SectionHeader(title: 'Updates'),
           _SettingsTile(
-            icon: Icons.system_update_outlined,
-            title: 'Check for Updates',
-            subtitle: 'Tap to check GitHub for new releases',
-            trailing: const Icon(Icons.chevron_right_rounded),
+            icon: _latestVersion != null
+                ? Icons.system_update_rounded
+                : Icons.system_update_outlined,
+            title: _latestVersion != null
+                ? 'Update Available (v$_latestVersion)'
+                : 'Check for Updates',
+            subtitle: _latestVersion != null
+                ? 'v$_currentVersion — v$_latestVersion ready to install'
+                : _otaCheckDone
+                    ? 'v$_currentVersion — up to date'
+                    : 'v$_currentVersion — checking…',
+            trailing: _latestVersion != null
+                ? Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: Colors.redAccent.shade200,
+                      shape: BoxShape.circle,
+                    ),
+                  )
+                : const Icon(Icons.chevron_right_rounded),
             onTap: () => showOtaUpdateDialog(context),
           ),
 

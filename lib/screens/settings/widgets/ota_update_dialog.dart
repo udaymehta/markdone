@@ -109,6 +109,7 @@ class _OtaUpdateDialogState extends State<_OtaUpdateDialog> {
     try {
       final path = await OtaUpdateService.downloadApk(
         url: _data!.downloadUrl,
+        version: _data!.latestVersion,
         onProgress: (fraction) {
           if (mounted) setState(() => _progress = fraction);
         },
@@ -317,12 +318,9 @@ class _OtaUpdateDialogState extends State<_OtaUpdateDialog> {
 
       case _OtaDialogState.available:
         return [
-          TextButton(
-            onPressed: _openInBrowser,
-            child: const Text('Open in Browser'),
-          ),
+          TextButton(onPressed: _openInBrowser, child: const Text('Open in Browser')),
           TextButton(onPressed: _dismiss, child: const Text('Dismiss')),
-          FilledButton.icon(
+          TextButton.icon(
             onPressed: _downloadApk,
             icon: const Icon(Icons.download_rounded, size: 18),
             label: const Text('Download'),
@@ -335,7 +333,7 @@ class _OtaUpdateDialogState extends State<_OtaUpdateDialog> {
       case _OtaDialogState.ready:
         return [
           TextButton(onPressed: _dismiss, child: const Text('Later')),
-          FilledButton.icon(
+          TextButton.icon(
             onPressed: _installApk,
             icon: const Icon(Icons.download_done_rounded, size: 18),
             label: const Text('Install'),
@@ -345,11 +343,8 @@ class _OtaUpdateDialogState extends State<_OtaUpdateDialog> {
       case _OtaDialogState.failed:
         return [
           TextButton(onPressed: _dismiss, child: const Text('Dismiss')),
-          TextButton(
-            onPressed: _openInBrowser,
-            child: const Text('Open in Browser'),
-          ),
-          FilledButton.icon(
+          TextButton(onPressed: _openInBrowser, child: const Text('Open in Browser')),
+          TextButton.icon(
             onPressed: _downloadApk,
             icon: const Icon(Icons.refresh_rounded, size: 18),
             label: const Text('Retry'),
