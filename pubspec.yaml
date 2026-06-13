@@ -1,7 +1,7 @@
 name: markdone
 description: "MarkDone! is a minimal, portable Markdown task tracker."
 publish_to: "none" # Remove this line if you wish to publish to pub.dev
-version: 1.8.0
+version: 1.9.0
 
 environment:
   sdk: ^3.11.1
